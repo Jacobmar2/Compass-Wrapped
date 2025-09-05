@@ -139,7 +139,7 @@ print("WCE trips:", int(WCETripsNum))
 print("------------------------------")
 
 
-print("Your top 5 SkyTrain Stations are:")
+print("Your top 5 SkyTrain Stations are: ")
 
 
 

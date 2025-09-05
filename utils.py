@@ -15,7 +15,7 @@ def ProcessList(data):
             result.append(item)
     return result
 
-def CountElementsInList(items):
+def CountElementsInList(items):    # Each element has a station name and number (representing amount of times used)
     counts = []  # list of (element, count)
 
     for item in items:

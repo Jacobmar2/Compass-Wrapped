@@ -131,6 +131,14 @@ print(f"Of which {percentSSW:.1f}% ({int(SSWtripsNum)} trips) are SkyTrain/SeaBu
 
 print("------------------------------")
 
+print("Among these trips, you have made:")
+print("Skytrain trips:", int(SkytrainTripsNum))
+print("Seabus trips:", SeabusTripsNum)
+print("WCE trips:", int(WCETripsNum))
+
+print("------------------------------")
+
+
 print("Your top 5 SkyTrain Stations are:")
 
 

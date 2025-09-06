@@ -32,6 +32,6 @@ def CountElementsInList(items):    # Each element has a station name and number 
     counts.sort(key=lambda x: (-x[1], x[0]))
     return counts
 
-def PrintElements(result):
+def PrintElements(result):      # prints the list of stations and their counts
     for element, count in result:
         print(f"{element}: {count}")

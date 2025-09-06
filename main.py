@@ -9,7 +9,7 @@ import utils
 
 trips = []
 
-with open("CompassData/Compass Card History - 01641311939735363841 - Jan-01-2024 to Dec-31-2024.csv", newline="", encoding="utf-8") as csvfile:
+with open("CompassData/Compass Wrapped.csv", newline="", encoding="utf-8") as csvfile:
     reader = csv.reader(csvfile)
     next(reader)  # Skip the header (row 1)
     
@@ -120,6 +120,27 @@ WCETripsNum /= 2
 StationsCount = utils.CountElementsInList(SSWTapsNames)
 utils.PrintElements(StationsCount)
 
+#splitting between SkyTrain stns and WCE/Seabus stns
+
+SkyTrainStns = []
+SWCEStns = []
+
+for name, count in StationsCount:
+    if name.endswith("Stn"):
+        SkyTrainStns.append((name, count))
+    elif name.endswith("Quay") or name.endswith("Stn - WCE") or name.endswith("Station"):
+        SWCEStns.append((name, count))
+
+#utils.PrintElements(SkyTrainStns)
+#utils.PrintElements(SWCEStns)
+
+#Getting top 5 used SkyTrain Stns
+
+Top5SkyTrainStns = sorted(
+    SkyTrainStns,
+    key=lambda x: (-x[1], x[0])
+)[:5]
+
 
 print("------------------------------")
 
@@ -132,14 +153,16 @@ print(f"Of which {percentSSW:.1f}% ({int(SSWtripsNum)} trips) are SkyTrain/SeaBu
 print("------------------------------")
 
 print("Among these trips, you have made:")
-print("Skytrain trips:", int(SkytrainTripsNum))
-print("Seabus trips:", SeabusTripsNum)
-print("WCE trips:", int(WCETripsNum))
+print(int(SkytrainTripsNum), "Skytrain trips,")
+print(SeabusTripsNum, "Seabus trips, and")
+print(int(WCETripsNum), "WCE trips")
 
 print("------------------------------")
 
 
 print("Your top 5 SkyTrain Stations are: ")
+utils.PrintElements(Top5SkyTrainStns)
 
+print("------------------------------")
 
 

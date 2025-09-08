@@ -9,7 +9,7 @@ import utils
 
 trips = []
 
-with open("CompassData/Compass Wrapped.csv", newline="", encoding="utf-8") as csvfile:
+with open("CompassData/Evan's Compass Wrapped 2.csv", newline="", encoding="utf-8") as csvfile:
     reader = csv.reader(csvfile)
     next(reader)  # Skip the header (row 1)
     
@@ -20,7 +20,8 @@ with open("CompassData/Compass Wrapped.csv", newline="", encoding="utf-8") as cs
         trips.append(row[1])
 
 # All SkyTrain/Seabus/WCE taps
-SSWTaps = [stop for stop in trips if "Bus Stop" not in stop and "Loaded" not in stop]
+SSWTaps = [stop for stop in trips if "Bus Stop" not in stop and "Loaded" not in stop 
+           and "SV" not in stop and "COS" not in stop and "Purchase" not in stop]
 
 #testing section
 #SSWTaps = ["at Edmonds Stn","at Scott Rd Stn","at Edmonds Stn","at Lonsdale Quay","at Edmonds Stn","at Lonsdale Quay"]
@@ -110,7 +111,7 @@ WCETripsNum /= 2
 
 
 
-#print("Skytrain trips:", SkytrainTripsNum)
+#print("Skytrain trips:", SkytrainTripsNum)      #test lines
 #print("Seabus trips:", SeabusTripsNum)
 #print("WCE trips:", WCETripsNum)
 #print("\nPairs containing 'Missing':")
@@ -118,7 +119,7 @@ WCETripsNum /= 2
 #    print(pair)
 
 StationsCount = utils.CountElementsInList(SSWTapsNames)
-utils.PrintElements(StationsCount)
+#utils.PrintElements(StationsCount)
 
 #splitting between SkyTrain stns and WCE/Seabus stns
 
@@ -131,7 +132,7 @@ for name, count in StationsCount:
     elif name.endswith("Quay") or name.endswith("Stn - WCE") or name.endswith("Station"):
         SWCEStns.append((name, count))
 
-#utils.PrintElements(SkyTrainStns)
+utils.PrintElements(SkyTrainStns)
 #utils.PrintElements(SWCEStns)
 
 #Getting top 5 used SkyTrain Stns
@@ -141,8 +142,11 @@ Top5SkyTrainStns = sorted(
     key=lambda x: (-x[1], x[0])
 )[:5]
 
+UsageDict = dict(SkyTrainStns)
 
-print("------------------------------")
+UnusedStations = [stn for stn in utils.SkyTrainStns if UsageDict.get(stn, 0) == 0]
+
+print("==============================")
 
 print(f"You made a total of {int(TripsNum)} trips")
 
@@ -159,10 +163,13 @@ print(int(WCETripsNum), "WCE trips")
 
 print("------------------------------")
 
-
 print("Your top 5 SkyTrain Stations are: ")
 utils.PrintElements(Top5SkyTrainStns)
 
 print("------------------------------")
 
+print("These are SkyTrain stations you have not used:")
+for stn in UnusedStations:
+    print(stn)
 
+print("------------------------------")

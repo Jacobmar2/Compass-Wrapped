@@ -157,9 +157,9 @@ print(f"Of which {percentSSW:.1f}% ({int(SSWtripsNum)} trips) are SkyTrain/SeaBu
 print("------------------------------")
 
 print("Among these trips, you have made:")
-print(int(SkytrainTripsNum), "Skytrain trips,")
-print(SeabusTripsNum, "Seabus trips, and")
-print(int(WCETripsNum), "WCE trips")
+print(" ", int(SkytrainTripsNum), "Skytrain trips,")
+print(" ", SeabusTripsNum, "Seabus trips, and")
+print(" ", int(WCETripsNum), "WCE trips")
 
 print("------------------------------")
 
@@ -170,6 +170,6 @@ print("------------------------------")
 
 print("These are SkyTrain stations you have not used:")
 for stn in UnusedStations:
-    print(stn)
+    print(" ", stn)
 
 print("------------------------------")

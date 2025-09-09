@@ -34,7 +34,7 @@ def CountElementsInList(items):    # Each element has a station name and number 
 
 def PrintElements(result):      # prints the list of stations and their counts
     for element, count in result:
-        print(f"{element}: {count}")
+        print(" ", f"{element}: {count}")
 
 SkyTrainStns = [
     # --- Expo Line (Waterfront → King George branch) ---

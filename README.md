@@ -13,7 +13,7 @@ How to use (as of now):
 - Your output should appear similar to the screenshot below:
 
 Sample Terminal Output (Not real ridership data):
-![Alt text](Images\Screenshot 2025-09-08 214851.jpg)
+![Sample Output](Images/Screenshot%202025-09-08%20214851.jpg)
 
 Goals:
 - Use Flask to turn my project into a usable webapp

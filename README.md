@@ -1,20 +1,42 @@
 # Rides-Review
 
-A Spotify Wrapped style Transit Ridership Stats Infographic Maker
+A “Spotify Wrapped” style transit ridership stats generator for Compass Card data
 
-How to use (as of now):
+📖 Overview
 
-1. Make a folder called "CompassData" in the project folder (same folder that contains main.py)
-2. Download your compass card CSV file from the official compass website, preferrably an entire year's worth of data (choose previous year, or custom date range with start date at today of last year)
-- You can also choose any custom date range on the compass website itself, by setting the start and end dates first, then downloading the CSV file after setting those dates
-3. Upload your CSV download file into the CompassData folder
-4. In main.py, at line 12, replace the part that says "CompassData/Compass Wrapped.csv" with "CompassData/(Your compass datafile name).csv"
-5. Run: python main.py
-- Your output should appear similar to the screenshot below:
+Rides-Review takes your Compass Card CSV file and generates a fun, shareable “Wrapped” style summary of your annual transit usage.
+It shows stats like:
+🎉 Total trips taken
+🚉 Top 5 most-used SkyTrain stations
+⏰ Busiest times of day
+🗺️ Stations you’ve never visited
+The goal is to make your ridership patterns visual and shareable, similar to Spotify Wrapped.
 
-Sample Terminal Output (Not real ridership data):
+🚀 Getting Started
+1. Download Your Compass Data
+- Log in to the Compass Card website
+- Export your usage data as a CSV file (ideally 1 year of history)
+2. Set Up the Project
+- Clone this repo and create a folder called CompassData in the project root (same level as main.py).
+3. Add Your CSV File
+- Place your downloaded CSV into the CompassData/ folder
+- In main.py, line 12, update the path from:
+"CompassData/Compass Wrapped.csv"
+to:
+"CompassData/YourFileName.csv"
+4. Run the Program
+- python main.py
+5. View Your Results
+
+Your ridership stats will print in the terminal, like this:
 ![Sample Output](Images/Screenshot%202025-09-08%20214851.jpg)
 
-Goals:
-- Use Flask to turn my project into a usable webapp
-- Upload top 5 stations used like a "Spotify Wrapped" on stories
+🎯 Future Goals
+- Build a web app version with Flask
+- Add bar chart visualizations (Matplotlib / Plotly)
+- Generate “Wrapped-style” graphics for Instagram sharing
+- Add gamified stats (badges, milestones, etc.)
+
+🔒 Privacy Note
+- This project runs entirely locally.
+- Your Compass CSV is never uploaded or stored anywhere.

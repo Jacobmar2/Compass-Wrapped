@@ -9,7 +9,7 @@ import utils
 
 trips = []
 
-with open("CompassData/Compass Wrapped.csv", newline="", encoding="utf-8") as csvfile:
+with open("CompassData/Evan's Compass Wrapped 2.csv", newline="", encoding="utf-8") as csvfile:
     reader = csv.reader(csvfile)
     next(reader)  # Skip the header (row 1)
     

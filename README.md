@@ -2,17 +2,15 @@
 
 A “Spotify Wrapped” style transit ridership stats generator for Compass Card data
 
-📖 Overview
-
 Rides-Review takes your Compass Card CSV file and generates a fun, shareable “Wrapped” style summary of your annual transit usage.
 It shows stats like:
-🎉 Total trips taken
-🚉 Top 5 most-used SkyTrain stations
-⏰ Busiest times of day
-🗺️ Stations you’ve never visited
+- 🎉 Total trips taken
+- 🚉 Top 5 most-used SkyTrain stations
+- ⏰ Busiest times of day
+- 🗺️ Stations you’ve never visited
 The goal is to make your ridership patterns visual and shareable, similar to Spotify Wrapped.
 
-🚀 Getting Started
+### Getting Started
 1. Download Your Compass Data
 - Log in to the Compass Card website
 - Export your usage data as a CSV file (ideally 1 year of history)
@@ -31,12 +29,12 @@ to:
 Your ridership stats will print in the terminal, like this:
 ![Sample Output](Images/Screenshot%202025-09-08%20214851.jpg)
 
-🎯 Future Goals
+### Future Goals
 - Build a web app version with Flask
 - Add bar chart visualizations (Matplotlib / Plotly)
 - Generate “Wrapped-style” graphics for Instagram sharing
 - Add gamified stats (badges, milestones, etc.)
 
-🔒 Privacy Note
+### Privacy Note
 - This project runs entirely locally.
 - Your Compass CSV is never uploaded or stored anywhere.

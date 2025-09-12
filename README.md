@@ -2,7 +2,7 @@
 
 A “Spotify Wrapped” style transit ridership stats generator for Compass Card data
 
-Rides-Review takes your Compass Card CSV file and generates a fun, shareable “Wrapped” style summary of your annual transit usage.
+Compass-Wrapped takes your Compass Card CSV file and generates a fun, shareable “Wrapped” style summary of your annual transit usage.
 It shows stats like:
 - 🎉 Total trips taken, as well as SkyTrain, SeaBus, WCE trips
 - 🚉 Top 5 most-used SkyTrain stations

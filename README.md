@@ -1,4 +1,4 @@
-# Rides-Review
+# Compass-Wrapped
 
 A “Spotify Wrapped” style transit ridership stats generator for Compass Card data
 

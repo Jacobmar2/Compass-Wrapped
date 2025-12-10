@@ -7,6 +7,8 @@ It shows stats like:
 - 🎉 Total trips taken, as well as SkyTrain, SeaBus, WCE trips
 - 🚉 Top 5 most-used SkyTrain stations
 - 🗺️ Stations you’ve never visited
+- Hours of the day bar graph
+- Days of the week bar graph
 
 The goal is to make your ridership patterns visual and shareable, similar to Spotify Wrapped.
 

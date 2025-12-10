@@ -97,5 +97,7 @@ SkyTrainStns = [
     "Capstan Stn",
     "Aberdeen Stn",
     "Lansdowne Stn",
-    "Brighouse Stn"
+    "Brighouse Stn",
+
+    "Lonsdale Quay"
 ]

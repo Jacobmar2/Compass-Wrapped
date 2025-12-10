@@ -34,8 +34,7 @@ Your ridership stats will print in the terminal, like this (not real ridership d
 ![Sample Output](Images/Screenshot%202025-09-08%20214851.jpg)
 
 ### Future Goals
-- Build a web app version with Flask
-- Add bar chart visualizations (Matplotlib / Plotly)
+- Build a web app version with Flask (done on seperate version to combine later)
 - Generate “Wrapped-style” graphics for Instagram sharing
 - Add gamified stats (badges, milestones, etc.)
 

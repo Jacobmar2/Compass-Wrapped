@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 trips = []
-fileName = "CompassData/Jerico's Compass Wrapped.csv"
+fileName = "CompassData/Compass Wrapped 2025.csv"
 
 with open(fileName, newline="", encoding="utf-8") as csvfile:
     reader = csv.reader(csvfile)

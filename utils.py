@@ -56,26 +56,6 @@ def remove_refund_pairs(taps):
 
     return cleaned
 
-
-def plot_station_counts(result):
-    # Unpack
-    elements = [item[0] for item in result]
-    counts = [item[1] for item in result]
-
-    # Reverse so highest is at the top
-    elements = elements[::-1]
-    counts = counts[::-1]
-
-    plt.figure(figsize=(10, len(result) * 0.4))
-    plt.barh(elements, counts)
-
-    plt.xlabel("Count")
-    plt.ylabel("Station")
-    plt.title("Station Usage Counts")
-
-    plt.tight_layout()
-    plt.show()
-
 SkyTrainStns = [
     # --- Expo Line (Waterfront → King George branch) ---
     "Waterfront Stn",

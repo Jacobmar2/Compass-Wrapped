@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Your Top Stations</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="results-card-2">
+
+        <h1>You have taken a total of 
+            <span class="yellow">{{ TripsNum }}</span> trips!
+        </h1>
+
+        <h2>
+            Of which 
+            <span class="yellow">{{ percentSSW|round(1) }}%</span> 
+            (<span class="yellow">{{ SSWtripsNum }}</span> trips)
+            are SkyTrain/SeaBus/WCE
+        </h2>
+
+        <p class="sub">
+            Among these trips,<br>
+            you have made:
+        </p>
+
+        <p class="breakdown">
+            <span class="skytrain">{{ SkytrainTripsNum }}</span> SkyTrain trips<br>
+            <span class="seabus">{{ SeabusTripsNum }}</span> SeaBus trips, and<br>
+            <span class="wce">{{ WCETripsNum }}</span> WCE trips
+        </p>
+
+    </div>
+
+    <div class="results-card-2 card-green">
+
+        <h1>Trips Overview
+        </h1>
+
+        <h2>
+            You have used Transit <br>
+            on <span class="yellow">{{ countDays }}</span> days!
+        </h2>
+
+        <p class="sub">
+            On average, you have taken:
+        </p>
+
+        <p class="breakdown-2">
+            <span class="yellow">{{  (TripsNum / 365) | round(2) }}</span> trips per day<br>
+            <span class="yellow">{{  (TripsNum / countDays) | round(2)  }}</span> trips per day you used Transit<br>
+            <span class="yellow">{{  (TripsNum / 52) | round(2)  }}</span> trips per week<br>
+            <span class="yellow">{{  (TripsNum / 12) | round(2)  }}</span> trips per month<br>
+        </p>
+
+    </div>
+
+    <div class="results-card">
+        <h2>Your Top Stations</h2>
+        <ul>
+            {% for s in stations %}
+            <li>
+                <div class="rank">{{ s.rank }}</div>
+                <div class="icon {% if s.icon == 'millennium' %}highlight{% endif %}">
+                    <img src="{{ url_for('static', filename=s.icon + '.png') }}" alt="icon">
+                </div>
+                <div class="details">
+                    <div class="station-name">{{ s.name }}</div>
+                    <div class="station-lines">{{ s.lines }}</div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        <br>
+    </div>
+
+    
+    
+<!-- 📌 Carousel Section -->
+<div class="carousel-container">
+
+    <div class="carousel" id="carousel">
+        
+        <div class="slide">
+            <h2>SkyTrain Station Usage</h2>
+            <div class="chart-wrapper" style="height: {{ station_values|length * 35 }}px;">
+                <canvas id="stationChart"></canvas>
+            </div>
+        </div>
+
+
+        <div class="slide">
+            <h2>Hours of the Day Usage</h2>
+            <div class="chart-wrapper" style="width: {{ hours|length * 35 }}px; height: 500px;">
+                <canvas id="hourChart"></canvas>
+            </div>
+        </div>
+
+        <div class="slide">
+            <h2>Days of the Week Usage</h2>
+            <div class="chart-wrapper" style="width: {{ hours|length * 35 }}px; height: 500px;">
+                <canvas id="weekdayChart"></canvas>
+            </div>
+        </div>
+
+        <div class="slide">
+            <h2>Unused SkyTrain Stations</h2>
+
+            {% if UnusedStations %}
+                <ul class="unused-list">
+                    {% for stn in UnusedStations %}
+                        <li>{{ stn }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>You used every SkyTrain station this year! 🚇🎉</p>
+            {% endif %}
+        </div>
+
+        <div class="slide">
+            <h2>More Coming Soon!</h2>
+        </div>
+
+    </div>
+
+    <div class="carousel-indicators">
+        <span class="indicator active" onclick="goToSlide(0)">●</span>
+        <span class="indicator" onclick="goToSlide(1)">●</span>
+        <span class="indicator" onclick="goToSlide(2)">●</span>
+        <span class="indicator" onclick="goToSlide(3)">●</span>
+        <span class="indicator" onclick="goToSlide(4)">●</span>
+    </div>
+
+<!-- Buttons -->
+    <button class="carousel-btn left" onclick="moveSlide(-1)">❮</button>
+    <button class="carousel-btn right" onclick="moveSlide(1)">❯</button>
+    
+
+    
+</div>
+
+
+    <!-- ⭐ BACK BUTTON -->
+    <a href="/" class="button-card back-button">
+        &laquo; Upload Another File
+    </a>
+</body>
+
+</html>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+function moveSlide(direction) {
+    const slides = document.querySelectorAll(".slide");
+
+    let newIndex = currentSlide + direction;
+
+    if (newIndex < 0) newIndex = slides.length - 1;
+    if (newIndex >= slides.length) newIndex = 0;
+
+    goToSlide(newIndex);  // ✅ Use the proper function
+}
+</script>
+
+
+
+
+
+
+<script>
+// -------------------------------
+// 1. Station Count Chart
+// -------------------------------
+
+
+const stationCtx = document.getElementById('stationChart').getContext('2d');
+new Chart(stationCtx, {
+    
+    type: 'bar',
+    data: {
+        labels: {{ station_labels|tojson }},
+        datasets: [{
+            label: "Station Usage",
+            data: {{ station_values|tojson }},
+            backgroundColor: "#4da6ff"
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            tooltip: { enabled: true },
+            legend: { display: false }
+        },
+        scales: {
+            x: { beginAtZero: true },
+            y: { ticks: { autoSkip: false } }
+        }
+    }
+});
+
+
+
+// -------------------------------
+// 2. Hour of Day Chart
+// -------------------------------
+const hourCtx = document.getElementById('hourChart').getContext('2d');
+new Chart(hourCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ hours|tojson }},
+        datasets: [{
+            label: "Trips by Hour",
+            data: {{ hour_values|tojson }},
+            backgroundColor: "#4da6ff"
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { tooltip: { enabled: true }, legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+
+// -------------------------------
+// 3. Day of Week Chart
+// -------------------------------
+const weekdayCtx = document.getElementById('weekdayChart').getContext('2d');
+new Chart(weekdayCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ days|tojson }},
+        datasets: [{
+            label: "Trips by Day",
+            data: {{ weekday_values|tojson }},
+            backgroundColor: "#4da6ff"
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { tooltip: { enabled: true }, legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+</script>
+
+<script>
+let currentSlide = 0;
+
+const carousel = document.getElementById("carousel");
+const slides = document.querySelectorAll(".slide");
+const indicators = document.querySelectorAll(".indicator");
+
+// Adjust height to match active slide
+function updateCarouselHeight() {
+    const activeSlide = slides[currentSlide];
+    carousel.style.height = activeSlide.scrollHeight + "px";
+}
+
+// Jump to a specific slide
+function goToSlide(index) {
+    currentSlide = index;
+    carousel.style.transform = `translateX(-${index * 100}%)`;
+
+    indicators.forEach((dot, i) =>
+        dot.classList.toggle("active", i === index)
+    );
+
+    updateCarouselHeight();
+}
+
+// Arrows use goToSlide
+function moveSlide(direction) {
+    let newIndex = currentSlide + direction;
+
+    if (newIndex < 0) newIndex = slides.length - 1;
+    if (newIndex >= slides.length) newIndex = 0;
+
+    goToSlide(newIndex);   // ✔ fixes the issue
+}
+
+// Set initial height on load
+window.onload = () => updateCarouselHeight();
+</script>
+

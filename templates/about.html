@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>How to Get Your Compass CSV</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="card">
+        <h2>About Compass Wrapped</h2>
+    </div>
+
+    <!-- ⭐ SAMPLE TEXT BLOCK -->
+    <div class="howto-text">
+        <h3>What is Compass Wrapped?</h3>
+        <p>
+            A “Spotify Wrapped” style transit ridership stats generator for Compass Card data
+        </p>
+        <p>
+            Compass-Wrapped takes your Compass Card CSV file and generates a fun, shareable “Wrapped” style 
+            summary of your annual transit usage. It shows stats like:
+        </p>
+        <p class="text-left">
+            
+            ● 🎉 Total trips taken, as well as SkyTrain, SeaBus, WCE trips<br>
+            ● 🚉 Top 5 most-used SkyTrain stations<br>
+            ● 🗺️ Stations you’ve never visited<br>
+            ● Hours of the day bar graph<br>
+            ● Days of the week bar graph<br>
+            </p>
+        <p>
+            The goal is to make your ridership patterns visual and shareable, similar to Spotify Wrapped.
+        </p>
+        <p>
+            Made by Jacob Martinez
+        </p>
+
+        <h3>Notes</h3>
+        <div class="about-notes">
+            <p>
+                ● Each trip is counted by each tap on a bus or each pair of taps on SkyTrain/SeaBus/WCE.
+            </p>
+            <p>
+                ● SkyTrain trips are counted once for every 2 taps (entering and exiting) and for hours of day, days of week bar graphs
+                (entrance timestamp only, just like buses), while station usage are counted both for each entry and each exit.
+            </p>
+            <p>
+                ● Your CSV files will be private and will never be saved or uploaded anywhere. No data generated here will be saved anywhere either.
+            </p>
+            <p>
+                ● You may insert a time range shorter than a year, where all of the stats except for average number of trips 
+                per day/week/month (in the green box) will stay accurate
+            </p>
+            <p>
+                ● Not affiliated or supported by TransLink
+            </p>
+        </div>
+
+        
+    </div>
+
+    <a href="https://github.com/Jacobmar2/Compass-Wrapped" 
+        class="button-card-2"
+        target="_blank" 
+        rel="noopener noreferrer">
+            Source Code
+    </a>
+
+    <a href="https://github.com/Jacobmar2/Compass-Wrapped/issues" 
+        class="button-card-2"
+        target="_blank" 
+        rel="noopener noreferrer">
+            Submit any feedback/issue here
+    </a>
+
+
+
+    <a href="/" class="button-card back-button">
+        &laquo; Back to Home / Upload Page
+    </a>
+
+</body>
+</html>

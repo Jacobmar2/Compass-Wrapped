@@ -1,4 +1,6 @@
 #functions
+import matplotlib.pyplot as plt
+
 def printOutList(lst):
     for i, item in enumerate(lst, start=1):
         print(f"{i}. {item}")
@@ -35,6 +37,45 @@ def CountElementsInList(items):    # Each element has a station name and number 
 def PrintElements(result):      # prints the list of stations and their counts
     for element, count in result:
         print(" ", f"{element}: {count}")
+
+def remove_refund_pairs(taps):
+    cleaned = []
+    skip_next = False
+
+    for tap in taps:
+        if skip_next:
+            # Skip the item after "Refund"
+            skip_next = False
+            continue
+
+        if "Refund" in tap:
+            # Skip this element AND the next one
+            skip_next = True
+            continue
+        
+        cleaned.append(tap)
+
+    return cleaned
+
+
+def plot_station_counts(result):
+    # Unpack
+    elements = [item[0] for item in result]
+    counts = [item[1] for item in result]
+
+    # Reverse so highest is at the top
+    elements = elements[::-1]
+    counts = counts[::-1]
+
+    plt.figure(figsize=(10, len(result) * 0.4))
+    plt.barh(elements, counts)
+
+    plt.xlabel("Count")
+    plt.ylabel("Station")
+    plt.title("Station Usage Counts")
+
+    plt.tight_layout()
+    plt.show()
 
 SkyTrainStns = [
     # --- Expo Line (Waterfront → King George branch) ---
@@ -97,7 +138,70 @@ SkyTrainStns = [
     "Capstan Stn",
     "Aberdeen Stn",
     "Lansdowne Stn",
-    "Brighouse Stn",
-
-    "Lonsdale Quay"
+    "Brighouse Stn"
 ]
+
+stationIcons = {
+    # --- Expo Line (Waterfront → King George branch) ---
+    "Waterfront Stn": "icons/expcan",
+    "Burrard Stn": "icons/expo",
+    "Granville Stn": "icons/expo",
+    "Stadium Stn": "icons/expo",
+    "Main Street Stn": "icons/expo",
+    "Commercial Drive Stn": "icons/expmil",
+    "Nanaimo Stn": "icons/expo",
+    "29th Av Stn": "icons/expo",
+    "Joyce Stn": "icons/expo",
+    "Patterson Stn": "icons/expo",
+    "Metrotown Stn": "icons/expo",
+    "Royal Oak Stn": "icons/expo",
+    "Edmonds Stn": "icons/expo",
+    "22nd St Stn": "icons/expo",
+    "New Westminster Stn": "icons/expo",
+    "Columbia Stn": "icons/expo",
+    "Scott Road Stn": "icons/expo",
+    "Gateway Stn": "icons/expo",
+    "Surrey Central Stn": "icons/expo",
+    "King George Stn": "icons/expo",
+
+    # --- Expo Line (Columbia → Production Way-University branch) ---
+    "Sapperton Stn": "icons/expo",
+    "Braid Stn": "icons/expo",
+    "Lougheed Stn": "icons/expmil",
+    "Production Way Stn": "icons/expmil",
+
+    # --- Millennium Line (Lafarge Lake–Douglas → VCC–Clark) ---
+    "Lafarge Lake/Douglas College Stn": "icons/millennium",
+    "Lincoln Stn": "icons/millennium",
+    "Coquitlam Central Stn": "icons/millennium",
+    "Inlet Centre Stn": "icons/millennium",
+    "Moody Center Stn": "icons/millennium",
+    "Burquitlam Stn": "icons/millennium",
+    "Lake City Way Stn": "icons/millennium",
+    "Sperling Stn": "icons/millennium",
+    "Holdom Stn": "icons/millennium",
+    "Brentwood Stn": "icons/millennium",
+    "Gilmore Stn": "icons/millennium",
+    "Rupert Stn": "icons/millennium",
+    "Renfrew Stn": "icons/millennium",
+    "VCC-Clark Stn": "icons/millennium",
+
+    # --- Canada Line (Waterfront → YVR/Richmond branches) ---
+    "Vancouver City Centre Stn": "icons/canada",
+    "Yaletown-Roundhouse Stn": "icons/canada",
+    "Olympic Village Stn": "icons/canada",
+    "Broadway-City Hall Stn": "icons/canada",
+    "King Edward Stn": "icons/canada",
+    "Oakridge-41st Stn": "icons/canada",
+    "Langara-49th Stn": "icons/canada",
+    "Marine Drive Stn": "icons/canada",
+    "Bridgeport Stn": "icons/canada",
+    "Templeton Stn": "icons/canada",
+    "Sea Island Centre Stn": "icons/canada",
+    "YVR-Airport Stn": "icons/canada",
+    "Capstan Stn": "icons/canada",
+    "Aberdeen Stn": "icons/canada",
+    "Lansdowne Stn": "icons/canada",
+    "Brighouse Stn": "icons/canada"
+}
+

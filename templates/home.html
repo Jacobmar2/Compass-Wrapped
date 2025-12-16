@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Transit Data</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+
+
+<body>
+
+    <!-- Move this higher using .top-welcome -->
+    <div class="card top-welcome">
+        <h2>Welcome to Compass Wrapped!</h2>
+    </div>
+
+    <!-- Main button -->
+    <a href="/howto" class="button-card">
+        How to get your Compass Card CSV File
+    </a>
+
+    <!-- Upload form -->
+    <div class="card">
+        <h2>Upload Your Transit Compass Card CSV</h2>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".csv" required>
+            <button type="submit">Upload</button>
+        </form>
+    </div>
+
+    <a href="/about" class="button-card button-small">
+        About Compass Wrapped
+    </a>
+
+    <!-- Social icons footer -->
+    <div class="footer-icons">
+
+        <!-- GitHub Icon -->
+        <a href="https://github.com/Jacobmar2" target="_blank">
+            <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/github.svg" alt="GitHub">
+        </a>
+
+        <!-- LinkedIn Icon -->
+        <a href="https://www.linkedin.com/in/jacob-martinez0422/" target="_blank">
+            <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/linkedin.svg" alt="LinkedIn">
+        </a>
+
+    </div>
+
+</body>
+</html>

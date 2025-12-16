@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Compass Wrapped</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="card">
+    <h2>Your Top Stations</h2>
+    <ul>
+        {% for s in stations %}
+        <li>
+            <div class="rank">{{ s.rank }}</div>
+            <div class="icon {% if s.highlight %}highlight{% endif %}">
+                <img src="{{ url_for('static', filename='icons/' + s.icon) }}" alt="icon">
+            </div>
+            <div class="details">
+                <div class="station-name">{{ s.name }}</div>
+                <div class="station-lines">{{ s.lines }}</div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+</body>
+</html>

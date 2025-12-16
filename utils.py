@@ -1,5 +1,4 @@
 #functions
-import matplotlib.pyplot as plt
 
 def printOutList(lst):
     for i, item in enumerate(lst, start=1):

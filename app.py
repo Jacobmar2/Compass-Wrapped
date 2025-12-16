@@ -5,7 +5,6 @@ import csv
 import utils
 from collections import Counter
 from datetime import datetime
-import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = "uploads"

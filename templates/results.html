@@ -104,6 +104,13 @@
         </div>
 
         <div class="slide">
+            <h2>Months of the Year Usage</h2>
+            <div class="chart-wrapper" style="width: {{ hours|length * 35 }}px; height: 500px;">
+                <canvas id="monthChart"></canvas>
+            </div>
+        </div>
+
+        <div class="slide">
             <h2>Unused SkyTrain Stations</h2>
 
             {% if UnusedStations %}
@@ -115,6 +122,7 @@
             {% else %}
                 <p>You used every SkyTrain station this year! 🚇🎉</p>
             {% endif %}
+            
         </div>
 
         <div class="slide">
@@ -129,6 +137,7 @@
         <span class="indicator" onclick="goToSlide(2)">●</span>
         <span class="indicator" onclick="goToSlide(3)">●</span>
         <span class="indicator" onclick="goToSlide(4)">●</span>
+        <span class="indicator" onclick="goToSlide(5)">●</span>
     </div>
 
 <!-- Buttons -->
@@ -247,6 +256,29 @@ new Chart(weekdayCtx, {
         scales: { y: { beginAtZero: true } }
     }
 });
+
+// -------------------------------
+// 4. Month of Year Chart
+// -------------------------------  
+const monthCtx = document.getElementById('monthChart').getContext('2d');
+new Chart(monthCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ month|tojson }},
+        datasets: [{
+            label: "Trips by Month",
+            data: {{ month_values|tojson }},
+            backgroundColor: "#4da6ff"
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { tooltip: { enabled: true }, legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
 
 </script>
 

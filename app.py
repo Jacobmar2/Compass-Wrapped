@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import csv
 import utils
-from collections import Counter
+from collections import Counter, OrderedDict
 from datetime import datetime
 
 app = Flask(__name__)
@@ -234,6 +234,30 @@ def upload_file():
 
             count_by_weekday(result)
 
+            print("==============================")
+
+            month_counts = Counter()
+
+            def count_by_month(timestamps):
+
+                # Parse timestamps and count months
+                for ts in timestamps:
+                    ts = ts.strip()
+                    dt = datetime.strptime(ts, "%b-%d-%Y %I:%M %p")
+                    month_counts[dt.month - 1] += 1   # Jan = 0, Dec = 11
+
+                # Month labels
+                months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+                # Print all 12 months including zero-count ones
+                for i, month in enumerate(months):
+                    print(f"{month}: {month_counts.get(i, 0)}")
+
+                return month_counts
+            
+            count_by_month(result)
+
             #Counting different days used transit
             def count_unique_days(timestamps):
                 unique_days = set()
@@ -349,6 +373,11 @@ def upload_file():
             days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
             weekday_values = [weekday_counts.get(i, 0) for i in range(7)]
 
+            # 4. Month of year
+            months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            month_values = [month_counts.get(i, 0) for i in range(12)]
+
             os.remove(fileName)
             
             return render_template("results.html", stations=stations,
@@ -366,7 +395,9 @@ def upload_file():
                 days=days,
                 weekday_values=weekday_values,
                 UnusedStations=UnusedStations,
-                countDays=countDays
+                countDays=countDays,
+                month=months,
+                month_values=month_values
                 )
         
         elif not file.filename.lower().endswith(".csv"):

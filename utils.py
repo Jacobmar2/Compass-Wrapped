@@ -56,6 +56,84 @@ def remove_refund_pairs(taps):
 
     return cleaned
 
+def adjust_wce_eastbound(SSWTapsNames,i,SkytrainTripsNum,TripsNum,SSWtripsNum,WCETripsNum):
+    if (i <= len(SSWTapsNames) - 2):
+
+        if (
+            "Waterfront Stn" in SSWTapsNames[i+2]
+        ):
+            SkytrainTripsNum -= 1
+            TripsNum -= 1  
+            SSWtripsNum -= 1
+
+    if "Moody" in SSWTapsNames[i-1] and "Station" in SSWTapsNames[i-1]:
+        if "Moody Center Stn" in SSWTapsNames[i-3]:
+            SkytrainTripsNum -= 2
+            TripsNum -= 1  
+            SSWtripsNum -= 1
+
+    elif "Stn" in SSWTapsNames[i-1]:
+        print("here")
+        WCETripsNum += 1
+        SkytrainTripsNum += 1
+        TripsNum += 1  
+        SSWtripsNum += 1
+        if "Moody" in SSWTapsNames[i-1]:
+            SkytrainTripsNum -= 2
+            TripsNum -= 1  
+            SSWtripsNum -= 1
+
+    elif ("(Missing)" in SSWTapsNames[i-1]
+          and "(Missing)" in SSWTapsNames[i-2]
+          and "Moody Center Stn" in SSWTapsNames[i-3]):
+        SkytrainTripsNum -= 2
+        TripsNum -= 1  
+        SSWtripsNum -= 1
+        
+
+    return SkytrainTripsNum, TripsNum, SSWtripsNum, WCETripsNum
+
+def adjust_wce_westbound(SSWTapsNames,i,SkytrainTripsNum,TripsNum,SSWtripsNum,WCETripsNum):
+    if (i <= len(SSWTapsNames) - 2):
+
+        if (
+            "Moody Center Stn" in SSWTapsNames[i+2]
+        ):
+            SkytrainTripsNum -= 1
+            TripsNum -= 1  
+            SSWtripsNum -= 1
+
+    if "Waterfront Stn - WCE" in SSWTapsNames[i-1]:
+        if "Waterfront Stn" in SSWTapsNames[i-3]:
+            SkytrainTripsNum -= 2
+            TripsNum -= 1  
+            SSWtripsNum -= 1
+
+    elif "Stn" in SSWTapsNames[i-1]:
+        
+        WCETripsNum += 1
+        SkytrainTripsNum += 1
+        TripsNum += 1  
+        SSWtripsNum += 1
+        if "Waterfront" in SSWTapsNames[i-1]:
+            print("here")
+            SkytrainTripsNum -= 2
+            TripsNum -= 1  
+            SSWtripsNum -= 1
+    
+    elif "Quay" in SSWTapsNames[i-1]:
+        WCETripsNum += 1
+        SkytrainTripsNum -= 1
+
+    elif ("(Missing)" in SSWTapsNames[i-1]
+          and "(Missing)" in SSWTapsNames[i-2]
+          and "Waterfront Stn" in SSWTapsNames[i-3]):
+        SkytrainTripsNum -= 2
+        TripsNum -= 1  
+        SSWtripsNum -= 1
+
+    return SkytrainTripsNum, TripsNum, SSWtripsNum, WCETripsNum
+
 SkyTrainStns = [
     # --- Expo Line (Waterfront → King George branch) ---
     "Waterfront Stn",

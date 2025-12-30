@@ -153,171 +153,23 @@
     <a href="/" class="button-card back-button">
         &laquo; Upload Another File
     </a>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+    window.resultsData = {
+        station_labels: {{ station_labels|tojson }},
+        station_values: {{ station_values|tojson }},
+        hours: {{ hours|tojson }},
+        hour_values: {{ hour_values|tojson }},
+        days: {{ days|tojson }},
+        weekday_values: {{ weekday_values|tojson }},
+        month: {{ month|tojson }},
+        month_values: {{ month_values|tojson }}
+    };
+    </script>
+
+    <script src="{{ url_for('static', filename='results.js') }}"></script>
 </body>
 
 </html>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-function moveSlide(direction) {
-    const slides = document.querySelectorAll(".slide");
-
-    let newIndex = currentSlide + direction;
-
-    if (newIndex < 0) newIndex = slides.length - 1;
-    if (newIndex >= slides.length) newIndex = 0;
-
-    goToSlide(newIndex);  // ✅ Use the proper function
-}
-</script>
-
-
-
-
-
-
-<script>
-// -------------------------------
-// 1. Station Count Chart
-// -------------------------------
-
-
-const stationCtx = document.getElementById('stationChart').getContext('2d');
-new Chart(stationCtx, {
-    
-    type: 'bar',
-    data: {
-        labels: {{ station_labels|tojson }},
-        datasets: [{
-            label: "Station Usage",
-            data: {{ station_values|tojson }},
-            backgroundColor: "#4da6ff"
-        }]
-    },
-    options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            tooltip: { enabled: true },
-            legend: { display: false }
-        },
-        scales: {
-            x: { beginAtZero: true },
-            y: { ticks: { autoSkip: false } }
-        }
-    }
-});
-
-
-
-// -------------------------------
-// 2. Hour of Day Chart
-// -------------------------------
-const hourCtx = document.getElementById('hourChart').getContext('2d');
-new Chart(hourCtx, {
-    type: 'bar',
-    data: {
-        labels: {{ hours|tojson }},
-        datasets: [{
-            label: "Trips by Hour",
-            data: {{ hour_values|tojson }},
-            backgroundColor: "#4da6ff"
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { tooltip: { enabled: true }, legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
-    }
-});
-
-
-// -------------------------------
-// 3. Day of Week Chart
-// -------------------------------
-const weekdayCtx = document.getElementById('weekdayChart').getContext('2d');
-new Chart(weekdayCtx, {
-    type: 'bar',
-    data: {
-        labels: {{ days|tojson }},
-        datasets: [{
-            label: "Trips by Day",
-            data: {{ weekday_values|tojson }},
-            backgroundColor: "#4da6ff"
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { tooltip: { enabled: true }, legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
-    }
-});
-
-// -------------------------------
-// 4. Month of Year Chart
-// -------------------------------  
-const monthCtx = document.getElementById('monthChart').getContext('2d');
-new Chart(monthCtx, {
-    type: 'bar',
-    data: {
-        labels: {{ month|tojson }},
-        datasets: [{
-            label: "Trips by Month",
-            data: {{ month_values|tojson }},
-            backgroundColor: "#4da6ff"
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { tooltip: { enabled: true }, legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
-    }
-});
-
-
-</script>
-
-<script>
-let currentSlide = 0;
-
-const carousel = document.getElementById("carousel");
-const slides = document.querySelectorAll(".slide");
-const indicators = document.querySelectorAll(".indicator");
-
-// Adjust height to match active slide
-function updateCarouselHeight() {
-    const activeSlide = slides[currentSlide];
-    carousel.style.height = activeSlide.scrollHeight + "px";
-}
-
-// Jump to a specific slide
-function goToSlide(index) {
-    currentSlide = index;
-    carousel.style.transform = `translateX(-${index * 100}%)`;
-
-    indicators.forEach((dot, i) =>
-        dot.classList.toggle("active", i === index)
-    );
-
-    updateCarouselHeight();
-}
-
-// Arrows use goToSlide
-function moveSlide(direction) {
-    let newIndex = currentSlide + direction;
-
-    if (newIndex < 0) newIndex = slides.length - 1;
-    if (newIndex >= slides.length) newIndex = 0;
-
-    goToSlide(newIndex);   // ✔ fixes the issue
-}
-
-// Set initial height on load
-window.onload = () => updateCarouselHeight();
-</script>
-

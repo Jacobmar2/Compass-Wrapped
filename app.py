@@ -123,6 +123,16 @@ def upload_file():
                 elif other.endswith("Station") or other.endswith("Stn - WCE"):
                     WCETripsNum += 1
 
+
+            # Step 3a: Adjust for special WCE trip cases
+
+            for i in range(1,len(SSWTapsNames)):
+                if ("Waterfront Stn - WCE" in SSWTapsNames[i]):
+                    SkytrainTripsNum, TripsNum, SSWtripsNum, WCETripsNum = utils.adjust_wce_eastbound(SSWTapsNames,i,SkytrainTripsNum,TripsNum,SSWtripsNum,WCETripsNum)
+                elif ("Moody" in SSWTapsNames[i] and "Station" in SSWTapsNames[i]):
+                    SkytrainTripsNum, TripsNum, SSWtripsNum, WCETripsNum = utils.adjust_wce_westbound(SSWTapsNames,i,SkytrainTripsNum,TripsNum,SSWtripsNum,WCETripsNum)
+
+
             SkytrainTripsNum += 2*len(SeabusWSkyTrain) - SeabusTripsNum # remove seabus without skytrain
 
             SkytrainTripsNum /= 2
@@ -153,7 +163,7 @@ def upload_file():
                 elif name.endswith("Quay") or name.endswith("Stn - WCE") or name.endswith("Station"):
                     SWCEStns.append((name, count))
 
-            utils.PrintElements(SkyTrainStns)
+            #utils.PrintElements(SkyTrainStns)
             #utils.PrintElements(SWCEStns)
 
             #extracting timestamps of compass card usage: each hour of the day
@@ -190,7 +200,7 @@ def upload_file():
             result = filtered_df[0].tolist()
 
             #print(result)
-            print("==============================")
+            #print("==============================")
 
             hour_counts = Counter()
             def count_by_hour_all(timestamps):
@@ -209,11 +219,11 @@ def upload_file():
 
                     suffix = "AM" if hour < 12 else "PM"
 
-                    print(f"{hour_12:02d}:00–{hour_12:02d}:59 {suffix} → {hour_counts.get(hour, 0)}")
+                    #print(f"{hour_12:02d}:00–{hour_12:02d}:59 {suffix} → {hour_counts.get(hour, 0)}")
 
             hourly = count_by_hour_all(result)
 
-            print("==============================")
+            #print("==============================")
 
             weekday_counts = Counter()
             def count_by_weekday(timestamps):
@@ -229,13 +239,12 @@ def upload_file():
                         "Friday", "Saturday", "Sunday"]
 
                 # Print all 7 days including zero-count ones
-                for i, day in enumerate(days):
-                    print(f"{day}: {weekday_counts.get(i, 0)}")
+                # for i, day in enumerate(days):
+                #     print(f"{day}: {weekday_counts.get(i, 0)}")
 
             count_by_weekday(result)
 
-            print("==============================")
-
+            #print("==============================")
             month_counts = Counter()
 
             def count_by_month(timestamps):
@@ -251,8 +260,8 @@ def upload_file():
                         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
                 # Print all 12 months including zero-count ones
-                for i, month in enumerate(months):
-                    print(f"{month}: {month_counts.get(i, 0)}")
+                #for i, month in enumerate(months):
+                #    print(f"{month}: {month_counts.get(i, 0)}")
 
                 return month_counts
             

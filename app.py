@@ -4,7 +4,7 @@ import os
 import csv
 import utils
 from collections import Counter, OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = "uploads"
@@ -127,9 +127,9 @@ def upload_file():
             # Step 3a: Adjust for special WCE trip cases
 
             for i in range(1,len(SSWTapsNames)):
-                if ("Waterfront Stn - WCE" in SSWTapsNames[i]):
+                if ("Waterfront Stn - WCE" in SSWTapsNames[i] and "Transfer" in SSWTaps[i]):
                     SkytrainTripsNum, TripsNum, SSWtripsNum, WCETripsNum = utils.adjust_wce_eastbound(SSWTapsNames,i,SkytrainTripsNum,TripsNum,SSWtripsNum,WCETripsNum)
-                elif ("Moody" in SSWTapsNames[i] and "Station" in SSWTapsNames[i]):
+                elif ("Moody" in SSWTapsNames[i] and "Station" in SSWTapsNames[i] and "Transfer" in SSWTaps[i]):
                     SkytrainTripsNum, TripsNum, SSWtripsNum, WCETripsNum = utils.adjust_wce_westbound(SSWTapsNames,i,SkytrainTripsNum,TripsNum,SSWtripsNum,WCETripsNum)
 
 
@@ -280,6 +280,41 @@ def upload_file():
 
             countDays = count_unique_days(result)
 
+            #Counting longest streak
+            def longest_transit_streak_with_dates(timestamps):
+                # Convert timestamps → unique dates
+                dates = set()
+                for ts in timestamps:
+                    ts = ts.strip()
+                    dt = datetime.strptime(ts, "%b-%d-%Y %I:%M %p")
+                    dates.add(dt.date())
+
+                if not dates:
+                    return 0, None, None
+
+                sorted_dates = sorted(dates)
+
+                longest = 1
+                current = 1
+
+                longest_start = sorted_dates[0]
+                longest_end = sorted_dates[0]
+
+                current_start = sorted_dates[0]
+
+                for i in range(1, len(sorted_dates)):
+                    if sorted_dates[i] == sorted_dates[i - 1] + timedelta(days=1):
+                        current += 1
+                    else:
+                        current = 1
+                        current_start = sorted_dates[i]
+
+                    if current > longest:
+                        longest = current
+                        longest_start = current_start
+                        longest_end = sorted_dates[i]
+
+                return longest, longest_start, longest_end
 
             #Getting top 5 used SkyTrain Stns
 
@@ -294,27 +329,27 @@ def upload_file():
 
             print("==============================")
 
-            print(f"You made a total of {int(TripsNum)} trips")
+            print(f"You made a total of {(TripsNum)} trips")
 
             percentSSW = (SSWtripsNum/TripsNum) * 100
 
-            print(f"Of which {percentSSW:.1f}% ({int(SSWtripsNum)} trips) are SkyTrain/SeaBus/WCE")
+            print(f"Of which {percentSSW:.1f}% ({(SSWtripsNum)} trips) are SkyTrain/SeaBus/WCE")
 
             print("------------------------------")
 
             print("Among these trips, you have made:")
-            print(" ", int(SkytrainTripsNum), "Skytrain trips,")
+            print(" ", (SkytrainTripsNum), "Skytrain trips,")
             print(" ", SeabusTripsNum, "Seabus trips, and")
-            print(" ", int(WCETripsNum), "WCE trips")
+            print(" ", (WCETripsNum), "WCE trips")
 
             print("------------------------------")
 
             print("Your top 5 SkyTrain Stations are: ")
             utils.PrintElements(Top5SkyTrainStns)
 
-            print("These are SkyTrain stations you have not used:")
-            for stn in UnusedStations:
-                print(" ", stn)
+            #print("These are SkyTrain stations you have not used:")
+            #for stn in UnusedStations:
+            #    print(" ", stn)
 
             print("------------------------------")
 
@@ -329,6 +364,14 @@ def upload_file():
             print(f"{TripsNum/52:.2f} trips per week")
 
             print(f"{TripsNum/12:.2f} trips per month")
+
+            print("------------------------------")
+
+            streak, StreakStart, StreakEnd = longest_transit_streak_with_dates(result)
+
+            print(f"🔥 Longest transit streak: {streak} days")
+            print(f"📅 From {StreakStart} to {StreakEnd}")
+
             
             # 👇 Replace this with your real processing logic
             # For now, just dummy data to show it works:
@@ -369,6 +412,8 @@ def upload_file():
                     "icon": icon
                 })
 
+            topName, topCount = Top5SkyTrainStns[0] if Top5SkyTrainStns else ("N/A", 0)
+
             # 1. Station usage (top/bottom or full list — your choice)
             station_labels = [name for (name, count) in SkyTrainStns]
             station_values = [count for (name, count) in SkyTrainStns]
@@ -389,6 +434,15 @@ def upload_file():
 
             os.remove(fileName)
             
+            # Determine top station image URL (if available in utils.stationImages)
+            topImage = None
+            topImageRaw = utils.stationImages.get(topName)
+            if topImageRaw:
+                if topImageRaw.startswith("http://") or topImageRaw.startswith("https://"):
+                    topImage = topImageRaw
+                else:
+                    topImage = url_for('static', filename=topImageRaw)
+            
             return render_template("results.html", stations=stations,
                 TripsNum=int(TripsNum),
                 SSWtripsNum=int(SSWtripsNum),
@@ -406,7 +460,9 @@ def upload_file():
                 UnusedStations=UnusedStations,
                 countDays=countDays,
                 month=months,
-                month_values=month_values
+                month_values=month_values,
+                streak=streak, StreakStart=StreakStart, StreakEnd=StreakEnd,
+                topName=topName, topCount=topCount, topImage=topImage
                 )
         
         elif not file.filename.lower().endswith(".csv"):

@@ -62,7 +62,7 @@ def adjust_wce_eastbound(SSWTapsNames,i,SkytrainTripsNum,TripsNum,SSWtripsNum,WC
         if (
             "Waterfront Stn" in SSWTapsNames[i+2]
         ):
-            SkytrainTripsNum -= 1
+            SkytrainTripsNum -= 2
             TripsNum -= 1  
             SSWtripsNum -= 1
 
@@ -99,7 +99,7 @@ def adjust_wce_westbound(SSWTapsNames,i,SkytrainTripsNum,TripsNum,SSWtripsNum,WC
         if (
             "Moody Center Stn" in SSWTapsNames[i+2]
         ):
-            SkytrainTripsNum -= 1
+            SkytrainTripsNum -= 2
             TripsNum -= 1  
             SSWtripsNum -= 1
 
@@ -260,5 +260,62 @@ stationIcons = {
     "Aberdeen Stn": "icons/canada",
     "Lansdowne Stn": "icons/canada",
     "Brighouse Stn": "icons/canada"
+}
+
+# --- Station images (generated) ---
+stationImages = {
+    "22nd St Stn": "https://upload.wikimedia.org/wikipedia/commons/5/5a/YVR22ndstrstn.JPG",
+    "29th Av Stn": "https://upload.wikimedia.org/wikipedia/commons/b/ba/29th_Avenue_platform_level_%2820190626_123343%29.jpg",
+    "Aberdeen Stn": "https://upload.wikimedia.org/wikipedia/commons/1/1c/Aberdeen_Station_2017-05-22_17.45.38.jpg",
+    "Braid Stn": "https://upload.wikimedia.org/wikipedia/commons/6/6c/Braid_station_entrance.jpg",
+    "Brentwood Stn": "https://upload.wikimedia.org/wikipedia/commons/5/59/Brentwood_Station_2022.jpg",
+    "Bridgeport Stn": "https://upload.wikimedia.org/wikipedia/commons/4/48/Bridgeport_Stn.jpg",
+    "Brighouse Stn": "https://upload.wikimedia.org/wikipedia/commons/f/f8/Richmond%E2%80%93Brighouse_platform_level%2C_May_2019_%283%29.jpg",
+    "Broadway-City Hall Stn": "https://upload.wikimedia.org/wikipedia/commons/f/f6/Broadway_Cityhall_stn.jpg",
+    "Burquitlam Stn": "https://upload.wikimedia.org/wikipedia/commons/b/be/Burquitlam_Station_Exterior.jpg",
+    "Burrard Stn": "https://upload.wikimedia.org/wikipedia/commons/f/f8/Vancouver_-_Burrard_Station_entrance_01.jpg",
+    "Capstan Stn": "https://upload.wikimedia.org/wikipedia/commons/8/82/Capstan_Station_Entrance_20241220.jpg",
+    "Columbia Stn": "https://upload.wikimedia.org/wikipedia/commons/3/32/Columbia_platform_level.jpg",
+    "Commercial Drive Stn": "https://upload.wikimedia.org/wikipedia/commons/a/a3/Commercial-Broadway_station.jpg",
+    "Coquitlam Central Stn": "https://upload.wikimedia.org/wikipedia/commons/a/a7/Coquitlam_Central_Station_Exterior.jpg",
+    "Edmonds Stn": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Edmonds_station%2C_August_2018.jpg",
+    "Gateway Stn": "https://upload.wikimedia.org/wikipedia/commons/0/07/Gateway_station%2C_October_2018.jpg",
+    "Gilmore Stn": "https://upload.wikimedia.org/wikipedia/commons/b/be/Gilmore_Station_Platform_2025.jpg",
+    "Granville Stn": "https://upload.wikimedia.org/wikipedia/commons/a/a1/Granville-Dunsmuir_Street_entrance.jpg",
+    "Holdom Stn": "https://upload.wikimedia.org/wikipedia/commons/5/57/Holdom_platform_level.jpg",
+    "Inlet Centre Stn": "https://upload.wikimedia.org/wikipedia/commons/0/02/Inlet_Centre_station.jpg",
+    "Joyce Stn": "https://upload.wikimedia.org/wikipedia/commons/3/37/Joyce%E2%80%93Collingwood_station_%2820190626_120404%29.jpg",
+    "King Edward Stn": "https://upload.wikimedia.org/wikipedia/commons/1/17/King_Edward_station_entrance.jpg",
+    "King George Stn": "https://upload.wikimedia.org/wikipedia/commons/b/bb/King_George_station_%282024%29.jpg",
+    "Lafarge Lake/Douglas College Stn": "https://upload.wikimedia.org/wikipedia/commons/d/d9/Lafarge_Lake_%E2%80%93_Douglas_SkyTrain_Station_Exterior.jpg",
+    "Lake City Way Stn": "https://upload.wikimedia.org/wikipedia/commons/5/56/Lake_City_Way_Station.JPG",
+    "Langara-49th Stn": "https://upload.wikimedia.org/wikipedia/commons/9/9e/Langara%E2%80%9349th_Avenue_station_entrance%2C_May_2019_%282%29.jpg",
+    "Lansdowne Stn": "https://upload.wikimedia.org/wikipedia/commons/6/65/Lansdowne_stn.jpg",
+    "Lincoln Stn": "https://upload.wikimedia.org/wikipedia/commons/c/c9/Lincoln_Station_Exterior.jpg",
+    "Lougheed Stn": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Lougheed_Town_Centre_platform_level.jpg",
+    "Main Street Stn": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Main_Street%E2%80%93Science_World_platform_level.jpg",
+    "Marine Drive Stn": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Marine_Drive_station%2C_January_2018.jpg",
+    "Metrotown Stn": "https://upload.wikimedia.org/wikipedia/commons/e/e5/Metrotown_Station_at_evening_2024.jpg",
+    "Moody Center Stn": "https://upload.wikimedia.org/wikipedia/commons/2/21/Moody_Centre_Station_2025.jpg",
+    "Nanaimo Stn": "https://upload.wikimedia.org/wikipedia/commons/1/1f/Nanaimo_station_entrance.jpg",
+    "New Westminster Stn": "https://upload.wikimedia.org/wikipedia/commons/2/28/New_Westminster_platform_level_%282%29.jpg",
+    "Oakridge-41st Stn": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Oakridge-41st_Avenue_Station.JPG",
+    "Olympic Village Stn": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Olympic_Village_station_entrance%2C_May_2019_%281%29.jpg",
+    "Production Way Stn": "https://upload.wikimedia.org/wikipedia/commons/4/45/Production_Way%E2%80%93University_station_platform.jpg",
+    "Renfrew Stn": "https://upload.wikimedia.org/wikipedia/commons/7/7c/MLine-Renfrew.jpg",
+    "Royal Oak Stn": "https://upload.wikimedia.org/wikipedia/commons/5/52/Royal_Oak_station%2C_March_2019.jpg",
+    "Rupert Stn": "https://upload.wikimedia.org/wikipedia/commons/1/11/Vancouver_Skytrain_Rupert_station_train.jpg",
+    "Sapperton Stn": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Sapperton_platform_level.jpg",
+    "Scott Road Stn": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Scott_Road_platform_level.jpg",
+    "Sea Island Centre Stn": "https://upload.wikimedia.org/wikipedia/commons/6/66/Sea_Island_Stn.jpg",
+    "Sperling Stn": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Sperling_Station_Exterior_20100116.jpg",
+    "Stadium Stn": "https://upload.wikimedia.org/wikipedia/commons/c/c7/Stadium%E2%80%93Chinatown_station%2C_March_2018.jpg",
+    "Surrey Central Stn": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Surrey_Central%E2%80%93City_Parkway_entrance.jpg",
+    "Templeton Stn": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Templeton_Stn.jpg",
+    "VCC-Clark Stn": "https://upload.wikimedia.org/wikipedia/commons/d/db/VCC-Clark_Station_Entrance.jpg",
+    "Vancouver City Centre Stn": "https://upload.wikimedia.org/wikipedia/commons/0/0d/Vancouver-City_Centre_station.jpg",
+    "Waterfront Stn": "https://upload.wikimedia.org/wikipedia/commons/0/04/Waterfront_station_2025.jpg",
+    "YVR-Airport Stn": "https://upload.wikimedia.org/wikipedia/commons/f/f8/YVR-Airport_Stn.JPG",
+    "Yaletown-Roundhouse Stn": "https://upload.wikimedia.org/wikipedia/commons/4/41/Yaletown_Roundhouse_Station_ext.jpg",
 }
 

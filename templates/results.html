@@ -53,6 +53,30 @@
             <span class="yellow">{{  (TripsNum / 12) | round(2)  }}</span> trips per month<br>
         </p>
 
+        <h2>
+            🔥 Longest Streak: <span class="yellow">{{ streak }}</span> days<br>
+            📅 From <span class="yellow">{{ StreakStart }}</span> to <span class="yellow">{{ StreakEnd }}</span>
+        </h2>
+
+    </div>
+
+    <div class="results-card top-station-card">
+        <h2>Your Top Station</h2>
+        <ul>
+            <li>
+                {% if topImage %}
+                <div class="top-image">
+                    <img src="{{ topImage }}" alt="{{ topName }} photo" class="top-station-photo">
+                </div>
+                {% endif %}
+                <div class="details">
+                    <h2>{{ topName }}</h2>
+                    <div class="station-name-2">{{ stations[0].lines }}</div>
+                    <div class="station-name-2">Total Uses: <span class="yellow">{{ topCount }}</span></div>
+                </div>
+            </li>
+        </ul>
+        <br>
     </div>
 
     <div class="results-card">

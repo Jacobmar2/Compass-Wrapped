@@ -170,6 +170,38 @@ li {
     border-radius: 50%;
 }
 
+.top-image {
+    margin-left: 12px;
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.top-image img.top-station-photo {
+    width: 400px;
+    height: 400px;
+    object-fit: cover;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+/* Stack image and details vertically for the top station card */
+.top-station-card ul li {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.top-station-card .icon {
+    margin: 12px 0;
+}
+.top-station-card .details {
+    width: 100%;
+}
+.top-station-card .top-image {
+    margin: 0 0 12px 0;
+}
+
 .details {
     flex: 1;
 }
@@ -177,6 +209,11 @@ li {
 .station-name {
     font-weight: bold;
     font-size: 1.2em;
+}
+
+.station-name-2 {
+    font-weight: bold;
+    font-size: 1.5em;
 }
 
 .station-lines {

@@ -31,6 +31,8 @@ Made by Jacob Martinez
 
 ● You may insert a time range shorter than a year, where all of the stats except for average number of trips per day/week/month (in the green box) will stay accurate
 
+● Image credit for Your Top Station goes to Wikimedia Commons, where all images are licensed under Creative Commons. Images are found from the station's main Wikipedia page.
+
 ● Not affiliated or supported by TransLink
 
 ● Uses MIT License

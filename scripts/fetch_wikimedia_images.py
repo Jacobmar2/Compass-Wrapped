@@ -8,6 +8,8 @@ Features:
 
 Usage:
   python scripts/fetch_wikimedia_images.py [--write] [--yes] [--out FILE]
+
+- Used to get a partial list of images for SkyTrain stations in Metro Vancouver, nonmatching images replaced manually
 """
 
 import argparse

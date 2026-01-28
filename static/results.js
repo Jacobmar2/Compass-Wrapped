@@ -4,13 +4,52 @@ document.addEventListener('DOMContentLoaded', () => {
   // Helper: safe get element
   const $ = (id) => document.getElementById(id);
 
+  // ========== STATION CHART SORTING ==========
+  let stationChart = null;
+  let currentStationSortMode = 'usage';
+  
+  window.sortStationChart = function(mode) {
+    currentStationSortMode = mode;
+    
+    // Update button states
+    document.getElementById('stationSortUsage')?.classList.toggle('active', mode === 'usage');
+    document.getElementById('stationSortAlpha')?.classList.toggle('active', mode === 'alphabetical');
+    
+    // Get sorted data
+    let labels = [...(data.station_labels || [])];
+    let values = [...(data.station_values || [])];
+    
+    // Create array of [label, value] pairs
+    let pairs = labels.map((label, idx) => ({ label, value: values[idx] }));
+    
+    if (mode === 'alphabetical') {
+      pairs.sort((a, b) => a.label.localeCompare(b.label));
+    } else {
+      // Sort by value descending (usage)
+      pairs.sort((a, b) => b.value - a.value);
+    }
+    
+    // Extract sorted labels and values
+    const sortedLabels = pairs.map(p => p.label);
+    const sortedValues = pairs.map(p => p.value);
+    
+    // Update chart data and re-render
+    if (stationChart) {
+      stationChart.data.labels = sortedLabels;
+      stationChart.data.datasets[0].data = sortedValues;
+      stationChart.update();
+    }
+  };
+
+  // ========== END STATION CHART SORTING ==========
+
   // -------------------------------
   // Charts (create only if canvas exists)
   // -------------------------------
   try {
     const stationCanvas = $('stationChart');
     if (stationCanvas && data.station_labels && data.station_values) {
-      new Chart(stationCanvas.getContext('2d'), {
+      stationChart = new Chart(stationCanvas.getContext('2d'), {
         type: 'bar',
         data: {
           labels: data.station_labels,
@@ -59,6 +98,35 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   } catch (e) { console.error('month chart error', e); }
+
+  // SSW Pie / Breakdown charts
+  try {
+    const sswCanvas = $('sswPieChart');
+    if (sswCanvas && data.ssw_counts) {
+      new Chart(sswCanvas.getContext('2d'), {
+        type: 'pie',
+        data: {
+          labels: data.ssw_counts_labels || ['SSW', 'Bus Only'],
+          datasets: [{ data: data.ssw_counts, backgroundColor: ['#4da6ff', '#0059b3'] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+  } catch (e) { console.error('ssw pie chart error', e); }
+
+  try {
+    const breakdownCanvas = $('sswBreakdownChart');
+    if (breakdownCanvas && data.ssw_breakdown) {
+      new Chart(breakdownCanvas.getContext('2d'), {
+        type: 'pie',
+        data: {
+          labels: data.ssw_breakdown_labels || ['SkyTrain', 'SeaBus', 'WCE'],
+          datasets: [{ data: data.ssw_breakdown, backgroundColor: ['#009cde', '#B1A59E', '#d131d1'] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+  } catch (e) { console.error('ssw breakdown chart error', e); }
 
   // -------------------------------
   // Carousel

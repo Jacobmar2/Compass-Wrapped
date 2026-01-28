@@ -436,6 +436,7 @@ body {
     height: auto;
 }
 
+
 /* Navigation buttons */
 .carousel-btn {
     position: absolute;
@@ -473,6 +474,20 @@ body {
     width: 100%;
 }
 
+.chart-wrapper-2 {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto;
+    transform: translateX(-50px);
+}
+
+.left-nudge {
+    transform: translateX(-50px);
+}
+
 .unused-list {
     list-style: none;
     padding: 0;
@@ -481,6 +496,7 @@ body {
     overflow-y: auto;       /* scrolls if too long */
     width: 80%;
     text-align: left;
+    transform: translateX(-40px);
 }
 
 .unused-list li {
@@ -491,3 +507,35 @@ body {
     font-size: 1.2em;
     box-shadow: 0 2px 5px rgba(0,0,0,0.15);
 }
+
+/* Sort buttons */
+.sort-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.sort-btn {
+    background-color: rgba(0, 0, 0, 0.2);
+    color: rgb(43, 38, 38);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    padding: 8px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.sort-btn:hover {
+    background-color: rgba(0, 0, 0, 0.35);
+    border-color: white;
+}
+
+.sort-btn.active {
+    background-color: white;
+    color: #009cde;
+    border-color: white;
+    font-weight: bold;
+}
+

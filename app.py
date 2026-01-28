@@ -59,6 +59,28 @@ def upload_file():
 
             SSWTapsNames = utils.ProcessList(SSWTaps)
 
+            # Extract and count bus stops
+            BusStops = [stop for stop in trips if "Bus Stop" in stop]
+            BusStopNumbers = []
+            
+            import re
+            for stop in BusStops:
+                # Extract 5-digit number from bus stop entry (e.g., "Bus Stop 50123")
+                match = re.search(r'\d{5}', stop)
+                if match:
+                    BusStopNumbers.append(match.group())
+            
+            # Count bus stops by their 5-digit number
+            BusStopCounts = utils.CountElementsInList(BusStopNumbers)
+            
+            # Get top 10 bus stops and map them to their names
+            Top10BusStops = BusStopCounts[:10]
+            Top10BusStopsWithNames = []
+            for stop_id, count in Top10BusStops:
+                # Try to get the stop name from the dictionary, fallback to "Bus Stop {id}"
+                stop_name = utils.busStopNames.get(stop_id, f"Bus Stop {stop_id}")
+                Top10BusStopsWithNames.append((stop_name, stop_id, count))
+
             #utils.printOutList(SSWTapsNames) #print out every SSW tap name
 
             SeabusWSkyTrain = []
@@ -323,6 +345,32 @@ def upload_file():
                 key=lambda x: (-x[1], x[0])
             )[:5]
 
+            #counting minutes spent on SSW
+            
+            def total_minutes_spent(fileName):
+                total_minutes = 0.0
+
+                with open(fileName, newline="", encoding="utf-8") as f:
+                    reader = csv.reader(f)
+                    rows = list(reader)
+
+                # Skip header row
+                data = rows[1:]
+
+                for i in range(len(data) - 1):
+                    timestamp = data[i][0].strip()   # Column A
+                    action = data[i][1].strip().lower()  # Column B
+
+                    # Only end-of-trip rows
+                    if "out" in action and "missing" not in action:
+                        ts_out = datetime.strptime(timestamp, "%b-%d-%Y %I:%M %p")
+                        ts_in = datetime.strptime(data[i + 1][0].strip(), "%b-%d-%Y %I:%M %p")
+
+                        diff_minutes = (ts_out - ts_in).total_seconds() / 60
+                        total_minutes += diff_minutes
+
+                return round(total_minutes, 1)
+
             UsageDict = dict(SkyTrainStns)
 
             UnusedStations = [stn for stn in utils.SkyTrainStns if UsageDict.get(stn, 0) == 0]
@@ -371,6 +419,10 @@ def upload_file():
 
             print(f"🔥 Longest transit streak: {streak} days")
             print(f"📅 From {StreakStart} to {StreakEnd}")
+
+            minutes = total_minutes_spent(fileName)
+            print(f"⏱ Total minutes spent on transit: {minutes}")
+
 
             
             # 👇 Replace this with your real processing logic
@@ -462,7 +514,9 @@ def upload_file():
                 month=months,
                 month_values=month_values,
                 streak=streak, StreakStart=StreakStart, StreakEnd=StreakEnd,
-                topName=topName, topCount=topCount, topImage=topImage
+                topName=topName, topCount=topCount, topImage=topImage,
+                minutes=int(minutes),
+                top10BusStops=Top10BusStopsWithNames
                 )
         
         elif not file.filename.lower().endswith(".csv"):

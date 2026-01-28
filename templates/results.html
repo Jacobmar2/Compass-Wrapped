@@ -30,6 +30,10 @@
             <span class="wce">{{ WCETripsNum }}</span> WCE trips
         </p>
 
+        <h2>
+            Minutes spent on SkyTrain/SeaBus/WCE: <span class="yellow">{{ minutes }}</span> 
+        </h2>
+
     </div>
 
     <div class="results-card-2 card-green">
@@ -97,8 +101,6 @@
         </ul>
         <br>
     </div>
-
-    
     
 <!-- 📌 Carousel Section -->
 <div class="carousel-container">
@@ -107,6 +109,10 @@
         
         <div class="slide">
             <h2>SkyTrain Station Usage</h2>
+            <div class="sort-buttons" style="margin-bottom: 15px;">
+                <button id="stationSortUsage" class="sort-btn active" onclick="sortStationChart('usage')">By Usage</button>
+                <button id="stationSortAlpha" class="sort-btn" onclick="sortStationChart('alphabetical')">A-Z</button>
+            </div>
             <div class="chart-wrapper" style="height: {{ station_values|length * 35 }}px;">
                 <canvas id="stationChart"></canvas>
             </div>
@@ -135,7 +141,7 @@
         </div>
 
         <div class="slide">
-            <h2>Unused SkyTrain Stations</h2>
+            <h2 class="left-nudge">Unused SkyTrain Stations</h2>
 
             {% if UnusedStations %}
                 <ul class="unused-list">
@@ -150,7 +156,17 @@
         </div>
 
         <div class="slide">
-            <h2>More Coming Soon!</h2>
+            <h2 class="left-nudge">SSW (SkyTrain, SeaBus, WCE) vs Bus Only</h2>
+            <div class="chart-wrapper-2" style="height: 400px; width: 400px;">
+                <canvas id="sswPieChart"></canvas>
+            </div>
+        </div>
+
+        <div class="slide">
+            <h2 class="left-nudge">SSW Breakdown</h2>
+            <div class="chart-wrapper-2" style="height: 400px; width: 400px;">
+                <canvas id="sswBreakdownChart"></canvas>
+            </div>
         </div>
 
     </div>
@@ -162,6 +178,7 @@
         <span class="indicator" onclick="goToSlide(3)">●</span>
         <span class="indicator" onclick="goToSlide(4)">●</span>
         <span class="indicator" onclick="goToSlide(5)">●</span>
+        <span class="indicator" onclick="goToSlide(6)">●</span>
     </div>
 
 <!-- Buttons -->
@@ -171,6 +188,26 @@
 
     
 </div>
+
+    <div class="results-card">
+        <h2>Your Top Bus Stops</h2>
+        {% if top10BusStops %}
+        <ul>
+            {% for stop_name, stop_id, count in top10BusStops %}
+            <li>
+                <div class="rank">{{ loop.index }}</div>
+                <div class="details">
+                    <div class="station-name">{{ stop_name }}</div>
+                    <div class="station-lines">Stop #{{ stop_id }} • Uses: <span class="yellow">{{ count }}</span></div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No bus stop data available.</p>
+        {% endif %}
+        <br>
+    </div>
 
 
     <!-- ⭐ BACK BUTTON -->
@@ -189,7 +226,11 @@
         days: {{ days|tojson }},
         weekday_values: {{ weekday_values|tojson }},
         month: {{ month|tojson }},
-        month_values: {{ month_values|tojson }}
+        month_values: {{ month_values|tojson }},
+        ssw_counts: [{{ SSWtripsNum }}, {{ TripsNum - SSWtripsNum }}],
+        ssw_counts_labels: ['SSW','Bus Only'],
+        ssw_breakdown: [{{ SkytrainTripsNum }}, {{ SeabusTripsNum }}, {{ WCETripsNum }}],
+        ssw_breakdown_labels: ['SkyTrain','SeaBus','WCE']
     };
     </script>
 

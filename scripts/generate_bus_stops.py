@@ -1,5 +1,6 @@
 """
 Parse TransLink stops.txt and generate bus stop dictionary
+Was in main folder (compass wrapped) when run, stored in scripts for now
 """
 
 import csv

@@ -371,6 +371,43 @@ def upload_file():
 
                 return round(total_minutes, 1)
 
+            # --- Top station pairs (unordered) for rows where action contains "out" ---
+            def top_station_pairs(fileName, top_n=10):
+                # Read CSV rows (skip header)
+                with open(fileName, newline="", encoding="utf-8") as f:
+                    reader = csv.reader(f)
+                    rows = list(reader)[1:]
+
+                pair_counts = Counter()
+
+                # iterate up to the penultimate row so we can look at the next row
+                for i in range(0, len(rows) - 1):
+                    action = str(rows[i][1]).strip()
+                    if "out" in action.lower() and "missing" not in action.lower():
+                        next_action = str(rows[i + 1][1]).strip()
+
+                        # Normalize names using utils.ProcessList to extract text after 'at'
+                        first_name, second_name = utils.ProcessList([action, next_action])
+
+                        # Keep only meaningful station-like entries OR include Missing
+                        def is_station_like(name):
+                            name = name or ""
+                            return (name.endswith("Stn") or name.endswith("Quay") or name.endswith("Station") or "Missing" in name)
+
+                        if not (is_station_like(first_name) or is_station_like(second_name)):
+                            # skip pairs that are not SSW station types
+                            continue
+
+                        # Use unordered pair (direction doesn't matter)
+                        pair_key = tuple(sorted([first_name, second_name]))
+                        pair_counts[pair_key] += 1
+
+                # Produce sorted list: by count desc, then names
+                pairs_sorted = sorted(pair_counts.items(), key=lambda x: (-x[1], x[0]))[:top_n]
+                return pairs_sorted
+
+            Top10StationPairs = top_station_pairs(fileName, top_n=10)
+
             UsageDict = dict(SkyTrainStns)
 
             UnusedStations = [stn for stn in utils.SkyTrainStns if UsageDict.get(stn, 0) == 0]
@@ -516,7 +553,8 @@ def upload_file():
                 streak=streak, StreakStart=StreakStart, StreakEnd=StreakEnd,
                 topName=topName, topCount=topCount, topImage=topImage,
                 minutes=int(minutes),
-                top10BusStops=Top10BusStopsWithNames
+                top10BusStops=Top10BusStopsWithNames,
+                top10StationPairs=Top10StationPairs
                 )
         
         elif not file.filename.lower().endswith(".csv"):

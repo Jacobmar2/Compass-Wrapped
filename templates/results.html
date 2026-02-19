@@ -209,6 +209,26 @@
         <br>
     </div>
 
+    <div class="results-card">
+        <h2>Your Top Station Pairs</h2>
+        {% if top10StationPairs %}
+        <ul>
+            {% for pair, count in top10StationPairs %}
+            <li>
+                <div class="rank">{{ loop.index }}</div>
+                <div class="details">
+                    <div class="station-name">{{ pair[0] }} ↔ {{ pair[1] }}</div>
+                    <div class="station-lines">Uses: <span class="yellow">{{ count }}</span></div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No station pair data available.</p>
+        {% endif %}
+        <br>
+    </div>
+
 
     <!-- ⭐ BACK BUTTON -->
     <a href="/" class="button-card back-button">

@@ -1,5 +1,8 @@
 # Bus stop names mapping (5-digit stop_code to stop_name) from TransLink GTFS data
 from bus_stops_dict import busStopNames
+import csv
+import os
+from functools import lru_cache
 
 #functions
 
@@ -315,4 +318,105 @@ stationImages = {
     "YVR-Airport Stn": "https://upload.wikimedia.org/wikipedia/commons/f/f8/YVR-Airport_Stn.JPG",
     "Yaletown-Roundhouse Stn": "https://upload.wikimedia.org/wikipedia/commons/4/41/Yaletown_Roundhouse_Station_ext.jpg",
 }
+
+STOPS_DATA_PATH = os.path.join(os.path.dirname(__file__), "static", "data", "stops.txt")
+
+stationLocationAliases = {
+    "29th Av Stn": "29th Avenue Station",
+    "Brighouse Stn": "Richmond-Brighouse Station",
+    "Commercial Drive Stn": "Commercial-Broadway Station",
+    "Langara-49th Stn": "Langara-49th Avenue Station",
+    "Main Street Stn": "Main Street-Science World Station",
+    "Moody Center Stn": "Moody Centre Station",
+    "Oakridge-41st Stn": "Oakridge-41st Avenue Station",
+    "Stadium Stn": "Stadium-Chinatown Station",
+}
+
+
+def normalize_station_name(name):
+    normalized = (name or "").strip().lower()
+    replacements = {
+        "–": "-",
+        "-": " ",
+        "/": " ",
+        "&": " ",
+        "@": " ",
+        ".": " ",
+        "station": " stn ",
+        "avenue": " av ",
+        "centre": " center ",
+    }
+
+    for old, new in replacements.items():
+        normalized = normalized.replace(old, new)
+
+    normalized = " ".join(normalized.split())
+    return normalized
+
+
+def station_location_priority(stop_name):
+    lowered = stop_name.lower()
+    if "platform 1" in lowered:
+        return 0
+    if "platform" in lowered:
+        return 1
+    if "station" in lowered and "@" not in stop_name:
+        return 2
+    if "bay" in lowered or "unloading" in lowered:
+        return 4
+    return 3
+
+
+@lru_cache(maxsize=1)
+def load_stop_location_indexes():
+    bus_locations = {}
+    station_locations = {}
+
+    with open(STOPS_DATA_PATH, newline="", encoding="utf-8") as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            stop_code = row["stop_code"].strip()
+            stop_name = row["stop_name"].strip()
+            stop_lat = row["stop_lat"].strip()
+            stop_lon = row["stop_lon"].strip()
+
+            if not stop_name or not stop_lat or not stop_lon:
+                continue
+
+            location = {
+                "name": stop_name,
+                "lat": float(stop_lat),
+                "lon": float(stop_lon),
+            }
+
+            if stop_code:
+                bus_locations[stop_code] = location
+
+            base_name = stop_name.split("@", 1)[0].strip()
+            normalized_name = normalize_station_name(base_name)
+            if "station" in stop_name.lower() or "stn" in stop_name.lower():
+                station_locations.setdefault(normalized_name, []).append(location)
+
+    return bus_locations, station_locations
+
+
+def get_bus_stop_location(stop_code):
+    bus_locations, _ = load_stop_location_indexes()
+    return bus_locations.get(str(stop_code))
+
+
+def get_station_location(station_name):
+    _, station_locations = load_stop_location_indexes()
+
+    candidate_keys = [normalize_station_name(station_name)]
+    alias = stationLocationAliases.get(station_name)
+    if alias:
+        candidate_keys.append(normalize_station_name(alias))
+
+    for key in candidate_keys:
+        candidates = station_locations.get(key, [])
+        if candidates:
+            return sorted(candidates, key=lambda item: station_location_priority(item["name"]))[0]
+
+    return None
 

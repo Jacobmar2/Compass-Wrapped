@@ -5,6 +5,7 @@ import csv
 import utils
 from collections import Counter, OrderedDict
 from datetime import datetime, timedelta
+import calendar
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = "uploads"
@@ -80,6 +81,40 @@ def upload_file():
                 # Try to get the stop name from the dictionary, fallback to "Bus Stop {id}"
                 stop_name = utils.busStopNames.get(stop_id, f"Bus Stop {stop_id}")
                 Top10BusStopsWithNames.append((stop_name, stop_id, count))
+
+            RemainingBusStops = BusStopCounts[10:]
+            RemainingBusStopsWithNames = []
+            for stop_id, count in RemainingBusStops:
+                stop_name = utils.busStopNames.get(stop_id, f"Bus Stop {stop_id}")
+                RemainingBusStopsWithNames.append((stop_name, stop_id, count))
+
+            topBusStopMapPoints = []
+            for rank, (stop_name, stop_id, count) in enumerate(Top10BusStopsWithNames, start=1):
+                location = utils.get_bus_stop_location(stop_id)
+                if not location:
+                    continue
+                topBusStopMapPoints.append({
+                    "rank": rank,
+                    "name": stop_name,
+                    "stop_id": stop_id,
+                    "count": count,
+                    "lat": location["lat"],
+                    "lon": location["lon"],
+                })
+
+            remainingBusStopMapPoints = []
+            for rank, (stop_name, stop_id, count) in enumerate(RemainingBusStopsWithNames, start=11):
+                location = utils.get_bus_stop_location(stop_id)
+                if not location:
+                    continue
+                remainingBusStopMapPoints.append({
+                    "rank": rank,
+                    "name": stop_name,
+                    "stop_id": stop_id,
+                    "count": count,
+                    "lat": location["lat"],
+                    "lon": location["lon"],
+                })
 
             #utils.printOutList(SSWTapsNames) #print out every SSW tap name
 
@@ -266,6 +301,12 @@ def upload_file():
 
             count_by_weekday(result)
 
+            # 7 x 24 matrix: each weekday has hourly usage counts
+            day_hour_values = [[0 for _ in range(24)] for _ in range(7)]
+            for ts in result:
+                dt = datetime.strptime(ts.strip(), "%b-%d-%Y %I:%M %p")
+                day_hour_values[dt.weekday()][dt.hour] += 1
+
             #print("==============================")
             month_counts = Counter()
 
@@ -338,12 +379,62 @@ def upload_file():
 
                 return longest, longest_start, longest_end
 
+            def has_full_month_coverage(timestamps):
+                used_dates = set()
+                for ts in timestamps:
+                    dt = datetime.strptime(ts.strip(), "%b-%d-%Y %I:%M %p")
+                    used_dates.add(dt.date())
+
+                if not used_dates:
+                    return False
+
+                months_with_usage = {(d.year, d.month) for d in used_dates}
+                for year, month in months_with_usage:
+                    days_in_month = calendar.monthrange(year, month)[1]
+                    if all(datetime(year, month, day).date() in used_dates for day in range(1, days_in_month + 1)):
+                        return True
+
+                return False
+
             #Getting top 5 used SkyTrain Stns
 
             Top5SkyTrainStns = sorted(
                 SkyTrainStns,
                 key=lambda x: (-x[1], x[0])
             )[:5]
+
+            RemainingSkyTrainStns = sorted(
+                SkyTrainStns,
+                key=lambda x: (-x[1], x[0])
+            )[5:]
+
+            topStationMapPoints = []
+            for rank, (name, count) in enumerate(Top5SkyTrainStns, start=1):
+                location = utils.get_station_location(name)
+                if not location:
+                    continue
+                topStationMapPoints.append({
+                    "rank": rank,
+                    "name": name,
+                    "count": count,
+                    "lat": location["lat"],
+                    "lon": location["lon"],
+                    "source_name": location["name"],
+                })
+
+            remainingStationMapPoints = []
+            for rank, (name, count) in enumerate(RemainingSkyTrainStns, start=6):
+                location = utils.get_station_location(name)
+                if not location:
+                    continue
+                remainingStationMapPoints.append({
+                    "rank": rank,
+                    "name": name,
+                    "count": count,
+                    "lat": location["lat"],
+                    "lon": location["lon"],
+                    "source_name": location["name"],
+                })
 
             #counting minutes spent on SSW
             
@@ -453,6 +544,7 @@ def upload_file():
             print("------------------------------")
 
             streak, StreakStart, StreakEnd = longest_transit_streak_with_dates(result)
+            fullMonthCoverage = has_full_month_coverage(result)
 
             print(f"🔥 Longest transit streak: {streak} days")
             print(f"📅 From {StreakStart} to {StreakEnd}")
@@ -515,6 +607,7 @@ def upload_file():
             # 3. Day of week
             days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
             weekday_values = [weekday_counts.get(i, 0) for i in range(7)]
+            weekday_full_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
             # 4. Month of year
             months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -531,6 +624,113 @@ def upload_file():
                     topImage = topImageRaw
                 else:
                     topImage = url_for('static', filename=topImageRaw)
+
+            awardsByTier = [
+                {
+                    "tier": "Easy / Bronze",
+                    "awards": [
+                        {
+                            "title": "7-Day Streak (Sun–Sat)",
+                            "description": "Used Transit every day of the week",
+                            "icon": "awards/fire-icon-free-png-bronze.png",
+                            "earned": streak >= 7,
+                        },
+                        {
+                            "title": "50 Active Days",
+                            "description": "Used Transit for 50 days of the year",
+                            "icon": "awards/TranslinkCompasslogo-bronze.png",
+                            "earned": countDays >= 50,
+                        },
+                        {
+                            "title": "200+ Rides",
+                            "description": ">200 rides in a year",
+                            "icon": "awards/Translinkbus-bronze.png",
+                            "earned": TripsNum > 200,
+                        },
+                        {
+                            "title": "50+ SkyTrain Rides",
+                            "description": ">50 SkyTrain rides in a year",
+                            "icon": "awards/Translinkexpo-bronze.png",
+                            "earned": SkytrainTripsNum > 50,
+                        },
+                    ],
+                },
+                {
+                    "tier": "Medium / Silver",
+                    "awards": [
+                        {
+                            "title": "100 Active Days",
+                            "description": "Used Transit for 100 days of the year",
+                            "icon": "awards/TranslinkCompasslogo-silver.png",
+                            "earned": countDays >= 100,
+                        },
+                        {
+                            "title": "2-Week Streak",
+                            "description": "Used Transit for 14 days in a row",
+                            "icon": "awards/fire-icon-free-png-silver.png",
+                            "earned": streak >= 14,
+                        },
+                        {
+                            "title": "Common Rider",
+                            "description": ">500 rides in a year",
+                            "icon": "awards/Translinkbus-silver.png",
+                            "earned": TripsNum > 500,
+                        },
+                        {
+                            "title": "Regular SkyTrain Rider",
+                            "description": ">200 SkyTrain rides in a year",
+                            "icon": "awards/Translinkexpo-silver.png",
+                            "earned": SkytrainTripsNum > 200,
+                        },
+                    ],
+                },
+                {
+                    "tier": "Hard / Gold",
+                    "awards": [
+                        {
+                            "title": "1-Month Streak",
+                            "description": "Used Transit every day of a full calendar month",
+                            "icon": "awards/fire-icon-free-png-gold.png",
+                            "earned": fullMonthCoverage,
+                        },
+                        {
+                            "title": "250 Active Days",
+                            "description": "Used Transit for 250 days of the year",
+                            "icon": "awards/TranslinkCompasslogo-gold.png",
+                            "earned": countDays >= 250,
+                        },
+                        {
+                            "title": "Frequent Rider",
+                            "description": ">1000 rides in a year",
+                            "icon": "awards/Translinkbus-gold.png",
+                            "earned": TripsNum > 1000,
+                        },
+                        {
+                            "title": "Frequent SkyTrain Rider",
+                            "description": ">600 SkyTrain rides in a year",
+                            "icon": "awards/Translinkexpo-gold.png",
+                            "earned": SkytrainTripsNum > 600,
+                        },
+                    ],
+                },
+                {
+                    "tier": "Extreme / Diamond",
+                    "awards": [
+                        {
+                            "title": "350 Active Days",
+                            "description": "Used Transit for 350 days of the year",
+                            "icon": "awards/TranslinkCompasslogo-diamond.png",
+                            "earned": countDays >= 350,
+                        },
+                        {
+                            "title": "All SkyTrain Stations Visited",
+                            "description": "Visited every SkyTrain station at least once in the year",
+                            "icon": "awards/Translinkexpo-diamond.png",
+                            "earned": len(UnusedStations) == 0,
+                        },
+                    ],
+                },
+            ]
             
             return render_template("results.html", stations=stations,
                 TripsNum=int(TripsNum),
@@ -546,6 +746,8 @@ def upload_file():
                 hour_values=hour_values,
                 days=days,
                 weekday_values=weekday_values,
+                weekday_full_names=weekday_full_names,
+                day_hour_values=day_hour_values,
                 UnusedStations=UnusedStations,
                 countDays=countDays,
                 month=months,
@@ -554,7 +756,15 @@ def upload_file():
                 topName=topName, topCount=topCount, topImage=topImage,
                 minutes=int(minutes),
                 top10BusStops=Top10BusStopsWithNames,
-                top10StationPairs=Top10StationPairs
+                top10StationPairs=Top10StationPairs,
+                topStationMapPoints=topStationMapPoints,
+                topBusStopMapPoints=topBusStopMapPoints,
+                remainingStationMapPoints=remainingStationMapPoints,
+                remainingBusStopMapPoints=remainingBusStopMapPoints,
+                awardsByTier=[
+                    {**tier, "awards": sorted(tier["awards"], key=lambda a: not a["earned"])}
+                    for tier in awardsByTier
+                ]
                 )
         
         elif not file.filename.lower().endswith(".csv"):

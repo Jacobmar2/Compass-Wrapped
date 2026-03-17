@@ -4,9 +4,34 @@
     <meta charset="UTF-8">
     <title>Your Top Stations</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
-    <div class="results-card-2">
+    <nav id="resultsSidebar" class="results-sidebar">
+        <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Toggle sidebar">☰</button>
+        <ul class="sidebar-nav">
+            <li><a href="#section-summary" class="sidebar-link" data-section="section-summary">Summary</a></li>
+            <li><a href="#section-overview" class="sidebar-link" data-section="section-overview">Trips Overview</a></li>
+            <li><a href="#section-top-station" class="sidebar-link" data-section="section-top-station">Top Station</a></li>
+            <li><a href="#section-top-stations" class="sidebar-link" data-section="section-top-stations">Top Stations</a></li>
+            <li><a href="#section-usage-carousel" class="sidebar-link" data-section="section-usage-carousel">Usage Carousel</a></li>
+            <li><a href="#section-bus-stops" class="sidebar-link" data-section="section-bus-stops">Bus Stops</a></li>
+            <li><a href="#section-transit-map" class="sidebar-link" data-section="section-transit-map">Transit Map</a></li>
+            <li><a href="#section-awards" class="sidebar-link" data-section="section-awards">Awards</a></li>
+
+            <li class="sidebar-group">
+                <button id="sidebarDeeperToggle" class="sidebar-group-toggle" type="button">
+                    Deeper Stats <span class="sidebar-arrow">▾</span>
+                </button>
+                <ul id="sidebarDeeperMenu" class="sidebar-submenu">
+                    <li><a href="#topStationPairsSection" class="sidebar-link sidebar-sublink" data-section="topStationPairsSection" data-requires-deeper="true">Station Pairs</a></li>
+                    <li><a href="#dayHourCarouselContainer" class="sidebar-link sidebar-sublink" data-section="dayHourCarouselContainer" data-requires-deeper="true">Daily Hour Carousel</a></li>
+                </ul>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="results-card-2" id="section-summary">
 
         <h1>You have taken a total of 
             <span class="yellow">{{ TripsNum }}</span> trips!
@@ -36,7 +61,7 @@
 
     </div>
 
-    <div class="results-card-2 card-green">
+    <div class="results-card-2 card-green" id="section-overview">
 
         <h1>Trips Overview
         </h1>
@@ -64,7 +89,7 @@
 
     </div>
 
-    <div class="results-card top-station-card">
+    <div class="results-card top-station-card" id="section-top-station">
         <h2>Your Top Station</h2>
         <ul>
             <li>
@@ -83,7 +108,7 @@
         <br>
     </div>
 
-    <div class="results-card">
+    <div class="results-card" id="section-top-stations">
         <h2>Your Top Stations</h2>
         <ul>
             {% for s in stations %}
@@ -103,8 +128,9 @@
     </div>
     
 <!-- 📌 Carousel Section -->
-<div class="carousel-container">
+<div class="carousel-container" id="section-usage-carousel">
 
+    <div class="carousel-viewport">
     <div class="carousel" id="carousel">
         
         <div class="slide">
@@ -140,7 +166,7 @@
             </div>
         </div>
 
-        <div class="slide">
+        <div class="slide slide-extra-right">
             <h2 class="left-nudge">Unused SkyTrain Stations</h2>
 
             {% if UnusedStations %}
@@ -155,20 +181,21 @@
             
         </div>
 
-        <div class="slide">
+        <div class="slide slide-extra-right">
             <h2 class="left-nudge">SSW (SkyTrain, SeaBus, WCE) vs Bus Only</h2>
             <div class="chart-wrapper-2" style="height: 400px; width: 400px;">
                 <canvas id="sswPieChart"></canvas>
             </div>
         </div>
 
-        <div class="slide">
+        <div class="slide slide-extra-right">
             <h2 class="left-nudge">SSW Breakdown</h2>
             <div class="chart-wrapper-2" style="height: 400px; width: 400px;">
                 <canvas id="sswBreakdownChart"></canvas>
             </div>
         </div>
 
+    </div>
     </div>
 
     <div class="carousel-indicators">
@@ -189,7 +216,7 @@
     
 </div>
 
-    <div class="results-card">
+    <div class="results-card" id="section-bus-stops">
         <h2>Your Top Bus Stops</h2>
         {% if top10BusStops %}
         <ul>
@@ -209,7 +236,66 @@
         <br>
     </div>
 
-    <div class="results-card">
+    <div class="results-card map-card" id="section-transit-map">
+        <h2>Your Transit Map</h2>
+        {% if topStationMapPoints or topBusStopMapPoints %}
+        <p class="map-subtitle">Top 5 SkyTrain stations and top 10 bus stops, ranked and numbered.</p>
+        <div class="map-legend">
+            <div class="legend-item"><span class="legend-swatch station"></span>SkyTrain stations</div>
+            <div class="legend-item"><span class="legend-swatch bus"></span>Bus stops</div>
+        </div>
+        <div id="topStopsMap" class="top-stops-map"></div>
+        {% if remainingStationMapPoints or remainingBusStopMapPoints %}
+        <div class="map-controls">
+            {% if remainingStationMapPoints %}
+            <button id="revealMoreStations" class="sort-btn map-control-btn" type="button">Reveal Next 5 Stations</button>
+            {% endif %}
+            {% if remainingBusStopMapPoints %}
+            <button id="revealMoreBusStops" class="sort-btn map-control-btn" type="button">Reveal Next 10 Bus Stops</button>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% else %}
+        <p>No location data available for the map.</p>
+        {% endif %}
+    </div>
+
+    <div class="results-card map-card awards-card" id="section-awards">
+        <h2>Your Awards</h2>
+        <p class="map-subtitle">Unlocked badges based on your yearly transit activity.</p>
+
+        {% for tier in awardsByTier %}
+        <div class="award-row">
+            <h3 class="award-tier-title">{{ tier.tier }}</h3>
+            <div class="award-carousel-shell">
+                <button id="awardPrev{{ loop.index0 }}" class="award-carousel-btn" type="button" onclick="moveAwardSlide({{ loop.index0 }}, -1)">❮</button>
+
+                <div class="award-carousel-viewport">
+                    <div class="award-carousel-track" id="awardCarouselTrack{{ loop.index0 }}">
+                        {% for award in tier.awards %}
+                        <div class="award-item {% if award.earned %}earned{% else %}locked{% endif %}">
+                            <img src="{{ url_for('static', filename=award.icon) }}" alt="{{ award.title }} icon" class="award-icon">
+                            <div class="award-text">
+                                <div class="award-name">{{ award.title }}</div>
+                                <div class="award-desc">{{ award.description }}</div>
+                            </div>
+                            <div class="award-status">{% if award.earned %}Unlocked{% else %}Locked{% endif %}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <button id="awardNext{{ loop.index0 }}" class="award-carousel-btn" type="button" onclick="moveAwardSlide({{ loop.index0 }}, 1)">❯</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <button id="deeperStatsToggle" class="sort-btn deeper-stats-toggle" onclick="toggleDeeperStats()">
+        Reveal deeper stats
+    </button>
+
+    <div class="results-card" id="topStationPairsSection">
         <h2>Your Top Station Pairs</h2>
         {% if top10StationPairs %}
         <ul>
@@ -229,6 +315,32 @@
         <br>
     </div>
 
+    <div class="carousel-container" id="dayHourCarouselContainer">
+
+        <div class="carousel-viewport">
+        <div class="carousel" id="dayHourCarousel">
+            {% for day_name in weekday_full_names %}
+            <div class="slide day-hour-slide">
+                <h2>Hours of the Day Usage — {{ day_name }}</h2>
+                <div class="chart-wrapper" style="width: {{ hours|length * 35 }}px; height: 500px;">
+                    <canvas id="dayHourChart{{ loop.index0 }}"></canvas>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        </div>
+
+        <div class="carousel-indicators" id="dayHourIndicators">
+            {% for _ in weekday_full_names %}
+            <span class="indicator day-hour-indicator {% if loop.first %}active{% endif %}" onclick="goToDayHourSlide({{ loop.index0 }})">●</span>
+            {% endfor %}
+        </div>
+
+        <button class="carousel-btn left" onclick="moveDayHourSlide(-1)">❮</button>
+        <button class="carousel-btn right" onclick="moveDayHourSlide(1)">❯</button>
+
+    </div>
+
 
     <!-- ⭐ BACK BUTTON -->
     <a href="/" class="button-card back-button">
@@ -236,6 +348,7 @@
     </a>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
     <script>
     window.resultsData = {
@@ -245,12 +358,18 @@
         hour_values: {{ hour_values|tojson }},
         days: {{ days|tojson }},
         weekday_values: {{ weekday_values|tojson }},
+        weekday_full_names: {{ weekday_full_names|tojson }},
+        day_hour_values: {{ day_hour_values|tojson }},
         month: {{ month|tojson }},
         month_values: {{ month_values|tojson }},
         ssw_counts: [{{ SSWtripsNum }}, {{ TripsNum - SSWtripsNum }}],
         ssw_counts_labels: ['SSW','Bus Only'],
         ssw_breakdown: [{{ SkytrainTripsNum }}, {{ SeabusTripsNum }}, {{ WCETripsNum }}],
-        ssw_breakdown_labels: ['SkyTrain','SeaBus','WCE']
+        ssw_breakdown_labels: ['SkyTrain','SeaBus','WCE'],
+        top_station_map_points: {{ topStationMapPoints|tojson }},
+        top_bus_stop_map_points: {{ topBusStopMapPoints|tojson }},
+        remaining_station_map_points: {{ remainingStationMapPoints|tojson }},
+        remaining_bus_stop_map_points: {{ remainingBusStopMapPoints|tojson }}
     };
     </script>
 

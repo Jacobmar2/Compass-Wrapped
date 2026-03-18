@@ -78,6 +78,18 @@ body {
     box-shadow: 0 6px 14px rgba(0,0,0,0.28);
 }
 
+.translink-button {
+    background-color: #0059b3;
+}
+
+.translink-button:hover {
+    background-color: #004a96;
+}
+
+.mobile-only-inline {
+    display: none;
+}
+
 .button-card-2:hover{
     background-color: #302c2c;
     transform: translateY(-3px);
@@ -333,6 +345,10 @@ body {
     transform: translateX(calc(-100% + 50px));
 }
 
+.sidebar-overlay {
+    display: none;
+}
+
 .sidebar-toggle {
     position: static;
     margin: 0 0 10px auto;
@@ -436,10 +452,6 @@ html {
     body {
         padding-left: 50px;
     }
-
-    .results-sidebar {
-        transform: translateX(calc(-100% + 50px));
-    }
 }
 
 .results-card-2 {
@@ -517,6 +529,7 @@ html {
     width: 90%;
     max-width: 900px;
     margin: 40px auto;
+    box-sizing: border-box;
     overflow: visible;
     border-radius: 12px;
     background: white;
@@ -561,7 +574,7 @@ html {
     flex: 0 0 100%;
     min-width: 0;
     box-sizing: border-box;
-    padding-left: 10px;
+    padding: 0 10px;
     text-align: center;
 }
 
@@ -654,6 +667,17 @@ html {
     display: flex;
     gap: 8px;
     justify-content: center;
+}
+
+.hour-range-controls {
+    display: none;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.hour-range-controls .sort-btn {
+    margin: 0;
 }
 
 .sort-btn {
@@ -926,12 +950,6 @@ html {
     background: rgba(23,48,66,0.06);
 }
 
-@media (max-width: 700px) {
-    .award-item {
-        flex-basis: 100%;
-    }
-}
-
 .leaflet-popup-content {
     margin: 12px 14px;
 }
@@ -949,7 +967,716 @@ html {
 
 @media (max-width: 768px) {
     .top-stops-map {
-        aspect-ratio: 9 / 7;
+        aspect-ratio: 6 / 7;
+    }
+}
+
+@media (max-width: 1024px) {
+    body {
+        padding: 30px 20px 30px 70px;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 20px 12px;
+    }
+
+    .map-subtitle {
+        font-size: 0.72rem;
+        margin: -2px 0 10px;
+    }
+
+    .map-legend {
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .legend-item {
+        gap: 6px;
+        font-size: 0.74rem;
+    }
+
+    .legend-swatch {
+        width: 13px;
+        height: 13px;
+        border-width: 1.5px;
+    }
+
+    .top-stops-map .leaflet-control-zoom a {
+        width: 12px;
+        height: 12px;
+        line-height: 22px;
+        font-size: 16px;
+    }
+
+    .top-stops-map .leaflet-control-attribution {
+        font-size: 8px;
+        padding: 0 2px;
+    }
+
+    .top-stops-map .leaflet-popup-content-wrapper {
+        border-radius: 8px;
+    }
+
+    .top-stops-map .leaflet-popup-content {
+        margin: 7px 8px;
+        font-size: 0.66rem;
+        line-height: 1.05;
+        max-width: 150px;
+    }
+
+    .top-stops-map .map-popup-title {
+        font-size: 0.74rem;
+        margin-bottom: 1px;
+    }
+
+    .top-stops-map .map-popup-meta {
+        font-size: 0.6rem;
+    }
+
+    .results-sidebar {
+        top: 0;
+        width: min(86vw, 340px);
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0 16px 16px 0;
+        padding: 16px 12px;
+        z-index: 1200;
+    }
+
+    .results-sidebar.collapsed {
+        transform: translateX(-100%);
+    }
+
+    .sidebar-toggle {
+        display: none;
+    }
+
+    .sidebar-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 1100;
+    }
+
+    body.sidebar-open .sidebar-overlay {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    body.sidebar-open {
+        overflow: hidden;
+    }
+
+    h2 {
+        font-size: 1.5em;
+    }
+
+    .card,
+    .card2,
+    .results-card,
+    .howto-block,
+    .button-card {
+        width: 88%;
+        min-width: 0;
+        max-width: 900px;
+    }
+
+    .button-card-2 {
+        width: 82%;
+        max-width: 520px;
+    }
+
+    .mobile-only-inline {
+        display: block;
+        margin-top: 0.35em;
+    }
+
+    .button-card,
+    .button-card-2 {
+        min-width: 0;
+        padding: 0.85em 0.95em;
+        margin: 0.75em 0;
+        font-size: 1.04em;
+        border-radius: 0.9em;
+    }
+
+    .results-card-2 {
+        width: 88%;
+        min-width: 0;
+        max-width: 500px;
+        margin: 14px 0;
+    }
+
+    .results-card-2 h1 {
+        font-size: 28px;
+    }
+
+    .results-card-2 h2 {
+        font-size: 20px;
+    }
+
+    .results-card h2 {
+        font-size: 1.25em;
+    }
+
+    .results-card li {
+        margin: 10px 0;
+    }
+
+    .rank {
+        font-size: 1.45em;
+        width: 1.7em;
+    }
+
+    .icon {
+        width: 2.4em;
+        height: 2.4em;
+        margin-right: 0.75em;
+    }
+
+    .station-name {
+        font-size: 1.02em;
+    }
+
+    .station-name-2 {
+        font-size: 1.2em;
+    }
+
+    .station-lines {
+        font-size: 0.78em;
+    }
+
+    .results-card-2 p,
+    .breakdown,
+    .breakdown-2 {
+        font-size: 18px;
+    }
+
+    .breakdown-2 {
+        padding: 10px 24px;
+    }
+
+    .top-image img.top-station-photo {
+        width: 100%;
+        max-width: 320px;
+        height: auto;
+    }
+
+    .howto-image {
+        width: 95%;
+    }
+
+    .howto-image img {
+        width: 92%;
+        min-width: 0;
+    }
+
+    .text-left {
+        padding: 0 18px;
+    }
+
+    .top-welcome {
+        padding-top: 0.85em;
+        padding-bottom: 0.85em;
+    }
+
+    .top-welcome h2 {
+        margin: 0;
+    }
+
+    .home-upload-form input[type="file"] {
+        font-size: 0.9em;
+        padding: 0.35em 0.6em;
+    }
+
+    .home-upload-form button[type="submit"] {
+        font-size: 0.9em;
+        padding: 0.45em 0.9em;
+    }
+
+    .footer-icons a,
+    .footer-icons img {
+        width: 32px;
+        height: 32px;
+    }
+
+    .ranked-map-marker {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+
+    .carousel-container {
+        width: 100%;
+        max-width: none;
+        margin: 24px auto;
+    }
+
+    .results-card:not(.awards-card),
+    .results-card-2 {
+        width: 84%;
+    }
+
+    .awards-card {
+        width: 88%;
+    }
+
+    .compact-chart {
+        width: 100% !important;
+        max-width: 100%;
+        height: 255px !important;
+        margin: 0 auto;
+    }
+
+    .pie-chart-wrapper {
+        width: min(260px, 76vw) !important;
+        height: min(260px, 76vw) !important;
+        transform: translateX(0);
+    }
+
+    .hour-range-controls {
+        display: flex;
+    }
+
+    .slide h2 {
+        font-size: 1.2em;
+        margin-bottom: 0.65em;
+    }
+
+    .slide p {
+        font-size: 0.95em;
+    }
+
+    .unused-list li {
+        font-size: 1em;
+        padding: 8px;
+    }
+
+    .sort-btn {
+        font-size: 0.8em;
+        padding: 5px 8px;
+        border-width: 1.5px;
+    }
+
+    .carousel-viewport,
+    .award-carousel-viewport {
+        touch-action: pan-y;
+    }
+
+    .carousel-btn,
+    .award-carousel-btn {
+        display: none;
+    }
+
+    .award-tier-title {
+        font-size: 1rem;
+    }
+
+    .award-item {
+        grid-template-columns: 44px 1fr;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .award-icon {
+        width: 44px;
+        height: 44px;
+    }
+
+    .award-name {
+        font-size: 0.82rem;
+    }
+
+    .award-desc {
+        font-size: 0.72rem;
+        line-height: 1.2;
+    }
+
+    .award-status {
+        font-size: 0.68rem;
+        padding: 2px 6px;
+    }
+
+    .slide.slide-extra-right {
+        padding-left: 10px;
+    }
+
+    .chart-wrapper-2,
+    .left-nudge,
+    .unused-list {
+        transform: translateX(0);
+    }
+
+    .unused-list {
+        width: 96%;
+    }
+}
+
+@media (max-width: 600px) {
+    body {
+        padding: 14px 10px;
+    }
+
+    .card,
+    .card2,
+    .results-card,
+    .howto-block,
+    .button-card,
+    .results-card-2 {
+        width: 90%;
+    }
+
+    .button-card-2 {
+        width: 70%;
+    }
+
+    .carousel-container {
+        width: 100%;
+        max-width: none;
+    }
+
+    .button-card,
+    .button-card-2 {
+        padding: 0.72em 0.82em;
+        margin: 0.62em 0;
+        font-size: 0.95em;
+        border-radius: 0.8em;
+    }
+
+    .results-card:not(.awards-card),
+    .results-card-2 {
+        width: 86%;
+    }
+
+    .awards-card {
+        width: 90%;
+    }
+
+    .compact-chart {
+        height: 220px !important;
+    }
+
+    .pie-chart-wrapper {
+        width: min(220px, 74vw) !important;
+        height: min(220px, 74vw) !important;
+    }
+
+    .results-card-2 h1 {
+        font-size: 24px;
+    }
+
+    .results-card-2 h2 {
+        font-size: 18px;
+    }
+
+    .results-card h2 {
+        font-size: 1.1em;
+    }
+
+    .results-card li {
+        margin: 8px 0;
+    }
+
+    .rank {
+        font-size: 1.22em;
+        width: 1.55em;
+        margin-right: 0.4em;
+    }
+
+    .icon {
+        width: 2.1em;
+        height: 2.1em;
+        margin-right: 0.55em;
+    }
+
+    .station-name {
+        font-size: 0.94em;
+    }
+
+    .station-name-2 {
+        font-size: 1.04em;
+    }
+
+    .station-lines {
+        font-size: 0.72em;
+    }
+
+    .results-card-2 p,
+    .breakdown,
+    .breakdown-2 {
+        font-size: 16px;
+    }
+
+    .breakdown-2 {
+        padding: 10px 14px;
+    }
+
+    .carousel-btn {
+        font-size: 22px;
+        padding: 6px 11px;
+    }
+
+    .slide h2 {
+        font-size: 1.05em;
+    }
+
+    .slide p {
+        font-size: 0.88em;
+    }
+
+    .unused-list li {
+        font-size: 0.9em;
+        padding: 7px;
+    }
+
+    .sort-btn {
+        font-size: 0.74em;
+        padding: 4px 7px;
+        border-width: 1.5px;
+    }
+
+    .sort-buttons {
+        flex-wrap: wrap;
+    }
+
+    .hour-range-controls {
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+    .award-item {
+        grid-template-columns: 38px 1fr;
+        gap: 7px;
+        padding: 7px;
+    }
+
+    .award-icon {
+        width: 38px;
+        height: 38px;
+    }
+
+    .award-name {
+        font-size: 0.76rem;
+    }
+
+    .award-desc {
+        font-size: 0.68rem;
+    }
+
+    .award-status {
+        font-size: 0.64rem;
+    }
+
+    .map-control-btn {
+        min-width: 0;
+        width: auto;
+        flex: 1 1 calc(50% - 8px);
+        max-width: calc(50% - 8px);
+        font-size: 0.78em;
+        padding: 7px 8px;
+        line-height: 1.2;
+    }
+
+    .map-controls .map-control-btn:only-child {
+        flex-basis: 100%;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 360px) {
+    body {
+        padding: 12px 8px;
+    }
+
+    .card,
+    .card2,
+    .results-card,
+    .howto-block,
+    .button-card,
+    .results-card-2 {
+        width: 90%;
+    }
+
+    .button-card-2 {
+        width: 70%;
+    }
+
+    .carousel-container {
+        width: 100%;
+        max-width: none;
+    }
+
+    .button-card,
+    .button-card-2 {
+        padding: 0.62em 0.72em;
+        margin: 0.52em 0;
+        font-size: 0.88em;
+        border-radius: 0.72em;
+    }
+
+    .results-card:not(.awards-card),
+    .results-card-2 {
+        width: 86%;
+    }
+
+    .awards-card {
+        width: 90%;
+    }
+
+    .compact-chart {
+        height: 200px !important;
+    }
+
+    .pie-chart-wrapper {
+        width: min(200px, 72vw) !important;
+        height: min(200px, 72vw) !important;
+    }
+
+    h2 {
+        font-size: 1.35em;
+    }
+
+    .results-card-2 h1 {
+        font-size: 21px;
+    }
+
+    .results-card-2 h2 {
+        font-size: 16px;
+    }
+
+    .results-card-2 p,
+    .breakdown,
+    .breakdown-2,
+    .unused-list li {
+        font-size: 14px;
+    }
+
+    .results-card h2 {
+        font-size: 1em;
+    }
+
+    .rank {
+        font-size: 1.05em;
+        width: 1.4em;
+    }
+
+    .icon {
+        width: 1.9em;
+        height: 1.9em;
+        margin-right: 0.45em;
+    }
+
+    .station-name {
+        font-size: 0.88em;
+    }
+
+    .station-lines {
+        font-size: 0.68em;
+    }
+
+    .slide h2 {
+        font-size: 0.98em;
+    }
+
+    .slide p {
+        font-size: 0.82em;
+    }
+
+    .sort-btn {
+        font-size: 0.68em;
+        padding: 4px 6px;
+        border-width: 1px;
+    }
+
+    .award-item {
+        grid-template-columns: 34px 1fr;
+        gap: 6px;
+        padding: 6px;
+    }
+
+    .award-icon {
+        width: 34px;
+        height: 34px;
+    }
+
+    .award-name {
+        font-size: 0.72rem;
+    }
+
+    .award-desc {
+        font-size: 0.64rem;
+        line-height: 1.15;
+    }
+
+    .award-status {
+        font-size: 0.6rem;
+        padding: 2px 5px;
+    }
+
+    .text-left {
+        padding: 0 10px;
+    }
+}
+
+@media (max-width: 768px) and (orientation: landscape) {
+    .hour-range-controls {
+        display: none;
+    }
+
+    #dayHourRangeControls {
+        display: none;
+    }
+
+    .compact-chart {
+        height: 340px !important;
+    }
+
+    .carousel-container {
+        width: 100%;
+        max-width: none;
+        padding: 6px;
+    }
+
+    .slide {
+        padding: 0 4px;
+    }
+
+    .sort-buttons,
+    .hour-range-controls {
+        gap: 4px;
+        margin-bottom: 6px;
+    }
+
+    .carousel-btn,
+    .award-carousel-btn {
+        display: none !important;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+    .carousel-container {
+        width: 100%;
+        max-width: none;
+        padding: 6px;
+    }
+
+    .slide {
+        padding: 0 4px;
+    }
+
+    .compact-chart {
+        height: 320px !important;
+    }
+
+    .carousel-btn,
+    .award-carousel-btn {
+        display: none !important;
     }
 }
 

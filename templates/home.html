@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome to Compass Wrapped!</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
@@ -24,7 +25,7 @@
     <!-- Upload form -->
     <div class="card">
         <h2>Upload Your Transit Compass Card CSV</h2>
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST" enctype="multipart/form-data" class="home-upload-form">
             <input type="file" name="file" accept=".csv" required>
             <button type="submit">Upload</button>
         </form>

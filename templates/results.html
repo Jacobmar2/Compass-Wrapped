@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Top Stations</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -30,6 +31,7 @@
             </li>
         </ul>
     </nav>
+    <div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
 
     <div class="results-card-2" id="section-summary">
 
@@ -139,7 +141,7 @@
                 <button id="stationSortUsage" class="sort-btn active" onclick="sortStationChart('usage')">By Usage</button>
                 <button id="stationSortAlpha" class="sort-btn" onclick="sortStationChart('alphabetical')">A-Z</button>
             </div>
-            <div class="chart-wrapper" style="height: {{ station_values|length * 35 }}px;">
+            <div class="chart-wrapper station-usage-chart" style="height: {{ station_values|length * 35 }}px;">
                 <canvas id="stationChart"></canvas>
             </div>
         </div>
@@ -147,21 +149,25 @@
 
         <div class="slide">
             <h2>Hours of the Day Usage</h2>
-            <div class="chart-wrapper" style="width: {{ hours|length * 35 }}px; height: 500px;">
+            <div class="hour-range-controls" id="hourRangeControls" aria-label="Hour range selector">
+                <button id="hourRangeAM" class="sort-btn active" type="button">AM</button>
+                <button id="hourRangePM" class="sort-btn" type="button">PM</button>
+            </div>
+            <div class="chart-wrapper compact-chart" style="width: {{ hours|length * 35 }}px; height: 500px;">
                 <canvas id="hourChart"></canvas>
             </div>
         </div>
 
         <div class="slide">
             <h2>Days of the Week Usage</h2>
-            <div class="chart-wrapper" style="width: {{ hours|length * 35 }}px; height: 500px;">
+            <div class="chart-wrapper compact-chart" style="width: {{ hours|length * 35 }}px; height: 500px;">
                 <canvas id="weekdayChart"></canvas>
             </div>
         </div>
 
         <div class="slide">
             <h2>Months of the Year Usage</h2>
-            <div class="chart-wrapper" style="width: {{ hours|length * 35 }}px; height: 500px;">
+            <div class="chart-wrapper compact-chart" style="width: {{ hours|length * 35 }}px; height: 500px;">
                 <canvas id="monthChart"></canvas>
             </div>
         </div>
@@ -183,14 +189,14 @@
 
         <div class="slide slide-extra-right">
             <h2 class="left-nudge">SSW (SkyTrain, SeaBus, WCE) vs Bus Only</h2>
-            <div class="chart-wrapper-2" style="height: 400px; width: 400px;">
+            <div class="chart-wrapper-2 pie-chart-wrapper" style="height: 400px; width: 400px;">
                 <canvas id="sswPieChart"></canvas>
             </div>
         </div>
 
         <div class="slide slide-extra-right">
             <h2 class="left-nudge">SSW Breakdown</h2>
-            <div class="chart-wrapper-2" style="height: 400px; width: 400px;">
+            <div class="chart-wrapper-2 pie-chart-wrapper" style="height: 400px; width: 400px;">
                 <canvas id="sswBreakdownChart"></canvas>
             </div>
         </div>
@@ -322,7 +328,11 @@
             {% for day_name in weekday_full_names %}
             <div class="slide day-hour-slide">
                 <h2>Hours of the Day Usage — {{ day_name }}</h2>
-                <div class="chart-wrapper" style="width: {{ hours|length * 35 }}px; height: 500px;">
+                <div class="hour-range-controls day-hour-range-controls" aria-label="Daily hour range selector">
+                    <button class="sort-btn day-hour-range-btn active" type="button" data-range="AM">AM</button>
+                    <button class="sort-btn day-hour-range-btn" type="button" data-range="PM">PM</button>
+                </div>
+                <div class="chart-wrapper compact-chart" style="width: {{ hours|length * 35 }}px; height: 500px;">
                     <canvas id="dayHourChart{{ loop.index0 }}"></canvas>
                 </div>
             </div>

@@ -322,13 +322,18 @@ stationImages = {
 STOPS_DATA_PATH = os.path.join(os.path.dirname(__file__), "static", "data", "stops.txt")
 
 stationLocationAliases = {
+    "22nd St Stn": "22nd Street Station",
     "29th Av Stn": "29th Avenue Station",
+    "Brentwood Stn": "Brentwood Town Centre Station",
     "Brighouse Stn": "Richmond-Brighouse Station",
     "Commercial Drive Stn": "Commercial-Broadway Station",
+    "Lafarge Lake/Douglas College Stn": "Lafarge Lake-Douglas Station",
     "Langara-49th Stn": "Langara-49th Avenue Station",
+    "Lougheed Stn": "Lougheed Town Centre Station",
     "Main Street Stn": "Main Street-Science World Station",
     "Moody Center Stn": "Moody Centre Station",
     "Oakridge-41st Stn": "Oakridge-41st Avenue Station",
+    "Sperling Stn": "Sperling-Burnaby Lake Station",
     "Stadium Stn": "Stadium-Chinatown Station",
 }
 

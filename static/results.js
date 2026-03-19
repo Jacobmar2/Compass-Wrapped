@@ -135,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
       deltaX = 0;
       deltaY = 0;
       axisLock = null;
+      viewportEl.classList.remove('is-swiping');
     };
 
     viewportEl.addEventListener('pointerdown', (event) => {
@@ -148,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
       deltaX = 0;
       deltaY = 0;
       axisLock = null;
+      viewportEl.classList.add('is-swiping');
     }, { passive: true });
 
     viewportEl.addEventListener('pointermove', (event) => {
@@ -304,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let edgeDeltaY = 0;
     let edgeAxisLock = null;
 
-    const edgeStartZone = 24;
     const edgeStartThreshold = 10;
     const edgeSwipeThreshold = 70;
 
@@ -320,7 +321,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('pointerdown', (event) => {
       if (!isPhoneMode() || !isSidebarCollapsed() || !event.isPrimary) return;
-      if (event.clientX > edgeStartZone) return;
+      if (event.target.closest('.carousel-viewport')) return;
+      if (event.target.closest('#section-transit-map, #section-awards')) return;
+      if (event.target.closest('button, a, input, select, textarea, label')) return;
 
       edgeTracking = true;
       edgePointerId = event.pointerId;
@@ -747,11 +750,23 @@ document.addEventListener('DOMContentLoaded', () => {
       hourChart.options.scales.x.ticks.maxTicksLimit = 24;
       hourChart.options.scales.x.ticks.callback = (_, index) => (
         index % 2 === 0 || index === displayedData.labels.length - 1
-      ) ? displayedData.labels[index] : '';
+      ) ? (() => {
+        if (!shouldSplitHoursByMeridiem()) {
+          return formatHourLabel(hourLabelsFull[index], true);
+        }
+        const baseIndex = hourRangeSelection === 'PM' ? 12 : 0;
+        return formatHourLabel(hourLabelsFull[baseIndex + index], true);
+      })() : '';
     } else {
       hourChart.options.scales.x.ticks.autoSkip = false;
       hourChart.options.scales.x.ticks.maxTicksLimit = 24;
-      hourChart.options.scales.x.ticks.callback = undefined;
+      hourChart.options.scales.x.ticks.callback = (_, index) => {
+        if (!shouldSplitHoursByMeridiem()) {
+          return formatHourLabel(hourLabelsFull[index], true);
+        }
+        const baseIndex = hourRangeSelection === 'PM' ? 12 : 0;
+        return formatHourLabel(hourLabelsFull[baseIndex + index], true);
+      };
     }
     hourChart.options.scales.x.ticks.font.size = fontSize;
     hourChart.options.scales.y.ticks.font.size = fontSize;
@@ -812,11 +827,23 @@ document.addEventListener('DOMContentLoaded', () => {
         chart.options.scales.x.ticks.maxTicksLimit = 24;
         chart.options.scales.x.ticks.callback = (_, index) => (
           index % 2 === 0 || index === displayedData.labels.length - 1
-        ) ? displayedData.labels[index] : '';
+        ) ? (() => {
+          if (!shouldSplitDayHourByMeridiem()) {
+            return formatHourLabel(fullLabels[index], true);
+          }
+          const baseIndex = dayHourRangeSelection === 'PM' ? 12 : 0;
+          return formatHourLabel(fullLabels[baseIndex + index], true);
+        })() : '';
       } else {
         chart.options.scales.x.ticks.autoSkip = false;
         chart.options.scales.x.ticks.maxTicksLimit = 24;
-        chart.options.scales.x.ticks.callback = undefined;
+        chart.options.scales.x.ticks.callback = (_, index) => {
+          if (!shouldSplitDayHourByMeridiem()) {
+            return formatHourLabel(fullLabels[index], true);
+          }
+          const baseIndex = dayHourRangeSelection === 'PM' ? 12 : 0;
+          return formatHourLabel(fullLabels[baseIndex + index], true);
+        };
       }
       chart.options.scales.x.ticks.font.size = getBarChartFontSize();
       chart.options.scales.y.ticks.font.size = getBarChartFontSize();
@@ -955,7 +982,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 maxTicksLimit: 24,
                 callback: (_, index) => (
                   isSideView() && (index % 2 !== 0) && (index !== initialHourData.labels.length - 1)
-                ) ? '' : initialHourData.labels[index],
+                ) ? '' : (() => {
+                  if (!shouldSplitHoursByMeridiem()) {
+                    return formatHourLabel(hourLabelsFull[index], true);
+                  }
+                  const baseIndex = hourRangeSelection === 'PM' ? 12 : 0;
+                  return formatHourLabel(hourLabelsFull[baseIndex + index], true);
+                })(),
                 maxRotation: 0,
                 minRotation: 0,
                 font: { size: hourFontSize }
@@ -1086,7 +1119,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 maxTicksLimit: 24,
                 callback: (_, index) => (
                   isSideView() && (index % 2 !== 0) && (index !== displayedData.labels.length - 1)
-                ) ? '' : displayedData.labels[index],
+                ) ? '' : (() => {
+                  if (!shouldSplitDayHourByMeridiem()) {
+                    return formatHourLabel(hourLabels[index], true);
+                  }
+                  const baseIndex = dayHourRangeSelection === 'PM' ? 12 : 0;
+                  return formatHourLabel(hourLabels[baseIndex + index], true);
+                })(),
                 maxRotation: 0,
                 minRotation: 0,
                 font: { size: getBarChartFontSize() }
@@ -1164,19 +1203,46 @@ document.addEventListener('DOMContentLoaded', () => {
   const slides = carousel ? carousel.querySelectorAll('.slide') : [];
   const indicators = document.querySelectorAll('.indicator:not(.day-hour-indicator)');
 
-  function updateCarouselHeight() {
+  function setActiveSlideClass(slideNodes, activeIndex) {
+    if (!slideNodes || !slideNodes.length) return;
+    slideNodes.forEach((slide, index) => {
+      slide.classList.toggle('active-slide', index === activeIndex);
+    });
+  }
+
+  function updateCarouselHeight({ compensateScroll = false } = {}) {
     if (!slides || !slides.length || !carousel) return;
     const activeSlide = slides[currentSlide];
-    carousel.style.height = activeSlide.scrollHeight + 'px';
+    const previousHeight = carousel.getBoundingClientRect().height;
+    const nextHeight = activeSlide.scrollHeight;
+    carousel.style.height = nextHeight + 'px';
+
+    if (!compensateScroll || !isSwipeMode()) return;
+
+    const shrinkAmount = previousHeight - nextHeight;
+    if (shrinkAmount <= 40) return;
+
+    const rect = carousel.getBoundingClientRect();
+    const viewportBottom = window.innerHeight;
+    const isInView = rect.top < viewportBottom && rect.bottom > 0;
+    const isNearLowerPart = rect.bottom > viewportBottom - 120;
+
+    if (isInView && isNearLowerPart) {
+      window.scrollBy({
+        top: -Math.min(shrinkAmount, 320),
+        behavior: 'smooth'
+      });
+    }
   }
 
   function goToSlide(index) {
     if (!carousel) return;
     currentSlide = index;
     carousel.style.transform = `translateX(-${index * 100}%)`;
+    setActiveSlideClass(slides, index);
 
     indicators.forEach((dot, i) => dot.classList.toggle('active', i === index));
-    updateCarouselHeight();
+    updateCarouselHeight({ compensateScroll: true });
   }
 
   function moveSlide(direction) {
@@ -1196,7 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        carousel.style.transition = originalTransition || 'transform 0.4s ease-in-out';
+        carousel.style.transition = originalTransition || 'transform 0.4s ease-in-out, height 0.45s cubic-bezier(0.22, 1, 0.36, 1)';
         moveSlide(-1);
       });
     });
@@ -1227,19 +1293,39 @@ document.addEventListener('DOMContentLoaded', () => {
   const dayHourSlides = dayHourCarousel ? dayHourCarousel.querySelectorAll('.day-hour-slide') : [];
   const dayHourIndicators = document.querySelectorAll('.day-hour-indicator');
 
-  function updateDayHourCarouselHeight() {
+  function updateDayHourCarouselHeight({ compensateScroll = false } = {}) {
     if (!dayHourSlides.length || !dayHourCarousel) return;
     const activeSlide = dayHourSlides[currentDayHourSlide];
-    dayHourCarousel.style.height = activeSlide.scrollHeight + 'px';
+    const previousHeight = dayHourCarousel.getBoundingClientRect().height;
+    const nextHeight = activeSlide.scrollHeight;
+    dayHourCarousel.style.height = nextHeight + 'px';
+
+    if (!compensateScroll || !isSwipeMode()) return;
+
+    const shrinkAmount = previousHeight - nextHeight;
+    if (shrinkAmount <= 40) return;
+
+    const rect = dayHourCarousel.getBoundingClientRect();
+    const viewportBottom = window.innerHeight;
+    const isInView = rect.top < viewportBottom && rect.bottom > 0;
+    const isNearLowerPart = rect.bottom > viewportBottom - 120;
+
+    if (isInView && isNearLowerPart) {
+      window.scrollBy({
+        top: -Math.min(shrinkAmount, 320),
+        behavior: 'smooth'
+      });
+    }
   }
 
   function goToDayHourSlide(index) {
     if (!dayHourCarousel) return;
     currentDayHourSlide = index;
     dayHourCarousel.style.transform = `translateX(-${index * 100}%)`;
+    setActiveSlideClass(dayHourSlides, index);
 
     dayHourIndicators.forEach((dot, i) => dot.classList.toggle('active', i === index));
-    updateDayHourCarouselHeight();
+    updateDayHourCarouselHeight({ compensateScroll: true });
   }
 
   function moveDayHourSlide(direction) {

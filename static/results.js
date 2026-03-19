@@ -187,6 +187,149 @@ document.addEventListener('DOMContentLoaded', () => {
     viewportEl.addEventListener('pointerleave', finishSwipe, { passive: true });
   }
 
+  function sanitizeFileName(text) {
+    return String(text || 'result')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function getScreenshotPadding() {
+    if (window.matchMedia('(max-width: 360px)').matches) return 20;
+    if (window.matchMedia('(max-width: 600px)').matches) return 24;
+    if (window.matchMedia('(max-width: 768px)').matches) return 28;
+    return 36;
+  }
+
+  function canvasToBlob(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+        reject(new Error('Screenshot capture failed.'));
+      }, 'image/png');
+    });
+  }
+
+  async function captureSectionScreenshot(sectionElement) {
+    if (typeof window.html2canvas !== 'function') {
+      throw new Error('Screenshot tool is not available.');
+    }
+
+    const padding = getScreenshotPadding();
+    const sectionRect = sectionElement.getBoundingClientRect();
+    const captureShell = document.createElement('div');
+    const sectionClone = sectionElement.cloneNode(true);
+
+    captureShell.style.position = 'fixed';
+    captureShell.style.left = '-10000px';
+    captureShell.style.top = '0';
+    captureShell.style.padding = `${padding}px`;
+    captureShell.style.background = '#ffffff';
+    captureShell.style.width = `${Math.ceil(sectionRect.width)}px`;
+    captureShell.style.boxSizing = 'content-box';
+
+    sectionClone.style.margin = '0';
+    sectionClone.style.width = `${Math.ceil(sectionRect.width)}px`;
+    sectionClone.querySelectorAll('.section-share-btn').forEach((node) => node.remove());
+
+    captureShell.appendChild(sectionClone);
+    document.body.appendChild(captureShell);
+
+    try {
+      return await window.html2canvas(captureShell, {
+        backgroundColor: '#ffffff',
+        scale: Math.min(2, window.devicePixelRatio || 1),
+        useCORS: true,
+        scrollX: 0,
+        scrollY: 0
+      });
+    } finally {
+      document.body.removeChild(captureShell);
+    }
+  }
+
+  function downloadBlob(blob, filename) {
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  function flashShareButtonState(button) {
+    if (!button) return;
+    const originalMarkup = button.dataset.originalMarkup || button.innerHTML;
+    button.innerHTML = '<span>✓</span>';
+    button.classList.add('copied');
+    window.setTimeout(() => {
+      button.innerHTML = originalMarkup;
+      button.classList.remove('copied');
+    }, 1200);
+  }
+
+  function initializeSectionShareButtons() {
+    const shareButtons = document.querySelectorAll('.section-share-btn[data-share-section]');
+    if (!shareButtons.length) return;
+
+    shareButtons.forEach((button) => {
+      button.dataset.originalMarkup = button.innerHTML;
+
+      button.addEventListener('click', async () => {
+        const sectionId = button.getAttribute('data-share-section');
+        if (!sectionId) return;
+
+        const sectionElement = document.getElementById(sectionId);
+        if (!sectionElement) return;
+
+        const sectionTitle = button.getAttribute('data-share-title') || 'My Compass Wrapped';
+        const fileSafeTitle = sanitizeFileName(sectionTitle) || 'result';
+        const fileName = `compass-wrapped-${fileSafeTitle}.png`;
+        button.disabled = true;
+        button.classList.add('is-loading');
+
+        const shareText = `Check out my Compass Wrapped ${sectionTitle}`;
+
+        try {
+          const canvas = await captureSectionScreenshot(sectionElement);
+          const screenshotBlob = await canvasToBlob(canvas);
+          const screenshotFile = new File([screenshotBlob], fileName, { type: 'image/png' });
+
+          const canShareFile = typeof navigator.canShare === 'function'
+            && navigator.canShare({ files: [screenshotFile] });
+
+          if (navigator.share && canShareFile) {
+            await navigator.share({
+              title: `Compass Wrapped: ${sectionTitle}`,
+              text: shareText,
+              files: [screenshotFile]
+            });
+          } else {
+            downloadBlob(screenshotBlob, fileName);
+          }
+
+          flashShareButtonState(button);
+        } catch (error) {
+          if (error?.name === 'AbortError') {
+            return;
+          }
+          window.alert('Could not create a screenshot for sharing. Please try again.');
+        } finally {
+          if (!button.classList.contains('copied')) {
+            button.innerHTML = button.dataset.originalMarkup || button.innerHTML;
+          }
+          button.classList.remove('is-loading');
+          button.disabled = false;
+        }
+      });
+    });
+  }
+
   // ========== DEEPER STATS TOGGLE ==========
   const topStationPairsSection = $('topStationPairsSection');
   const dayHourCarouselContainer = $('dayHourCarouselContainer');
@@ -243,6 +386,8 @@ document.addEventListener('DOMContentLoaded', () => {
   window.setDeeperStatsVisibility = setDeeperStatsVisibility;
 
   setDeeperStatsVisibility(false);
+
+  initializeSectionShareButtons();
 
   // ========== END DEEPER STATS TOGGLE ==========
 

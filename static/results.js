@@ -194,11 +194,33 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/^-+|-+$/g, '');
   }
 
-  function getScreenshotPadding() {
-    if (window.matchMedia('(max-width: 360px)').matches) return 20;
-    if (window.matchMedia('(max-width: 600px)').matches) return 24;
-    if (window.matchMedia('(max-width: 768px)').matches) return 28;
-    return 36;
+  function getScreenshotLayout(cardHeight) {
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      const targetHeight = Math.round(window.innerHeight * 0.88);
+      const baseHeight = cardHeight + (28 * 2);
+      return {
+        leftPadding: 18,
+        rightPadding: 18,
+        verticalPadding: 28,
+        captureHeight: Math.max(baseHeight, targetHeight)
+      };
+    }
+
+    if (window.matchMedia('(max-width: 1200px)').matches) {
+      return {
+        leftPadding: 45,
+        rightPadding: 0,
+        verticalPadding: 22,
+        captureHeight: null
+      };
+    }
+
+    return {
+      leftPadding: 45,
+      rightPadding: 0,
+      verticalPadding: 20,
+      captureHeight: null
+    };
   }
 
   function canvasToBlob(canvas) {
@@ -218,31 +240,48 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error('Screenshot tool is not available.');
     }
 
-    const padding = getScreenshotPadding();
-    const sectionRect = sectionElement.getBoundingClientRect();
+    const cardWidth = Math.ceil(sectionElement.offsetWidth);
+    const cardHeight = Math.ceil(sectionElement.offsetHeight);
+    const { leftPadding, rightPadding, verticalPadding, captureHeight } = getScreenshotLayout(cardHeight);
+    const captureWidth = cardWidth + leftPadding + rightPadding;
     const captureShell = document.createElement('div');
     const sectionClone = sectionElement.cloneNode(true);
 
     captureShell.style.position = 'fixed';
-    captureShell.style.left = '-10000px';
+    captureShell.style.left = '0';
     captureShell.style.top = '0';
-    captureShell.style.padding = `${padding}px`;
+    captureShell.style.zIndex = '-1';
+    captureShell.style.pointerEvents = 'none';
+    captureShell.style.padding = `${verticalPadding}px ${rightPadding}px ${verticalPadding}px ${leftPadding}px`;
     captureShell.style.background = '#ffffff';
-    captureShell.style.width = `${Math.ceil(sectionRect.width)}px`;
-    captureShell.style.boxSizing = 'content-box';
+    captureShell.style.width = `${captureWidth}px`;
+    captureShell.style.boxSizing = 'border-box';
+
+    if (captureHeight) {
+      captureShell.style.height = `${captureHeight}px`;
+      captureShell.style.display = 'flex';
+      captureShell.style.alignItems = 'center';
+      captureShell.style.justifyContent = 'center';
+    }
 
     sectionClone.style.margin = '0';
-    sectionClone.style.width = `${Math.ceil(sectionRect.width)}px`;
+    sectionClone.style.width = `${cardWidth}px`;
+    sectionClone.style.boxSizing = 'border-box';
+    sectionClone.style.boxShadow = 'none';
     sectionClone.querySelectorAll('.section-share-btn').forEach((node) => node.remove());
 
     captureShell.appendChild(sectionClone);
     document.body.appendChild(captureShell);
 
     try {
+      const shellWidth = Math.ceil(captureShell.offsetWidth);
+      const shellHeight = Math.ceil(captureShell.offsetHeight);
       return await window.html2canvas(captureShell, {
         backgroundColor: '#ffffff',
         scale: Math.min(2, window.devicePixelRatio || 1),
         useCORS: true,
+        width: shellWidth,
+        height: shellHeight,
         scrollX: 0,
         scrollY: 0
       });

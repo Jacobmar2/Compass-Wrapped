@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>More Compass Wrapped!</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .multi-csv-controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 1em;
+        }
+
+        .multi-csv-actions {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 2.2em;
+        }
+
+        .multi-csv-actions button {
+            margin: 0;
+            width: auto;
+            min-width: 140px;
+        }
+
+        .remove-csv-btn {
+            background-color: #d9534f;
+            color: #ffffff;
+        }
+
+        .remove-csv-btn:hover {
+            background-color: #c9302c;
+            color: #ffffff;
+        }
+
+        .multi-csv-list {
+            margin-top: 1em;
+            text-align: center;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .multi-csv-list-item {
+            margin: 6px auto;
+            word-break: break-word;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            max-width: 95%;
+        }
+
+        .multi-csv-file-name {
+            text-align: center;
+        }
+
+        .remove-one-file-btn {
+            width: 22px;
+            min-width: 22px;
+            height: 22px;
+            padding: 0;
+            margin: 0;
+            border-radius: 50%;
+            line-height: 1;
+            font-size: 0.9em;
+            background-color: #d9534f;
+            color: #ffffff;
+        }
+
+        .remove-one-file-btn:hover {
+            background-color: #c9302c;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>More Compass Wrapped!</h2>
+    </div>
+
+    <div class="card">
+        <h2>Upload multiple CSV's</h2>
+        <form id="multi-csv-form" method="POST" action="/more/upload-multiple" enctype="multipart/form-data">
+            <input id="multi-csv-input" type="file" name="files" accept=".csv" multiple style="display: none;">
+            <div class="multi-csv-controls">
+                <button id="multi-csv-add-btn" type="button">Browse...</button>
+            </div>
+            <p id="multi-csv-selected">No files selected yet.</p>
+            <div id="multi-csv-list" class="multi-csv-list"></div>
+            <div class="multi-csv-actions">
+                <button type="submit">Upload CSV's</button>
+                <button id="multi-csv-remove-btn" class="remove-csv-btn" type="button">Remove CSV's</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Compass Slideshow</h2>
+        <form method="POST" action="/more/upload-slideshow" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".csv" required>
+            <button type="submit">Upload CSV</button>
+        </form>
+    </div>
+
+    <a href="/" class="button-card button-small">&laquo; Back to Home / Upload Page</a>
+
+    <script>
+        const multiCsvForm = document.getElementById("multi-csv-form");
+        const multiCsvInput = document.getElementById("multi-csv-input");
+        const multiCsvAddBtn = document.getElementById("multi-csv-add-btn");
+        const multiCsvRemoveBtn = document.getElementById("multi-csv-remove-btn");
+        const multiCsvSelected = document.getElementById("multi-csv-selected");
+        const multiCsvList = document.getElementById("multi-csv-list");
+
+        let selectedFiles = [];
+
+        function fileKey(file) {
+            return `${file.name}__${file.size}__${file.lastModified}`;
+        }
+
+        function syncInputFiles() {
+            const dataTransfer = new DataTransfer();
+            selectedFiles.forEach((file) => dataTransfer.items.add(file));
+            multiCsvInput.files = dataTransfer.files;
+        }
+
+        function renderSelectedFiles() {
+            multiCsvList.innerHTML = "";
+
+            if (!selectedFiles.length) {
+                multiCsvAddBtn.textContent = "Browse...";
+                multiCsvSelected.textContent = "No files selected yet.";
+                return;
+            }
+
+            multiCsvAddBtn.textContent = "Add...";
+            multiCsvSelected.textContent = `Selected ${selectedFiles.length} file(s):`;
+
+            selectedFiles.forEach((file, index) => {
+                const item = document.createElement("p");
+                item.className = "multi-csv-list-item";
+
+                const fileName = document.createElement("span");
+                fileName.className = "multi-csv-file-name";
+                fileName.textContent = file.name;
+
+                const removeOneBtn = document.createElement("button");
+                removeOneBtn.type = "button";
+                removeOneBtn.className = "remove-one-file-btn";
+                removeOneBtn.textContent = "x";
+                removeOneBtn.setAttribute("aria-label", `Remove ${file.name}`);
+                removeOneBtn.addEventListener("click", () => {
+                    selectedFiles.splice(index, 1);
+                    syncInputFiles();
+                    renderSelectedFiles();
+                });
+
+                item.appendChild(fileName);
+                item.appendChild(removeOneBtn);
+                multiCsvList.appendChild(item);
+            });
+        }
+
+        multiCsvAddBtn.addEventListener("click", () => {
+            multiCsvInput.click();
+        });
+
+        multiCsvInput.addEventListener("change", () => {
+            const incomingFiles = Array.from(multiCsvInput.files || []);
+            const existingKeys = new Set(selectedFiles.map(fileKey));
+
+            incomingFiles.forEach((file) => {
+                const key = fileKey(file);
+                if (!existingKeys.has(key)) {
+                    selectedFiles.push(file);
+                    existingKeys.add(key);
+                }
+            });
+
+            syncInputFiles();
+            renderSelectedFiles();
+            multiCsvInput.value = "";
+        });
+
+        multiCsvRemoveBtn.addEventListener("click", () => {
+            selectedFiles = [];
+            syncInputFiles();
+            renderSelectedFiles();
+        });
+
+        multiCsvForm.addEventListener("submit", (event) => {
+            if (!selectedFiles.length) {
+                event.preventDefault();
+                multiCsvSelected.textContent = "Please add at least one CSV file.";
+                return;
+            }
+
+            syncInputFiles();
+        });
+
+        renderSelectedFiles();
+    </script>
+</body>
+</html>

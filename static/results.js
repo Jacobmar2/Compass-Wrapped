@@ -654,6 +654,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapContainer = $('topStopsMap');
     const stationPoints = Array.isArray(data.top_station_map_points) ? data.top_station_map_points : [];
     const busPoints = Array.isArray(data.top_bus_stop_map_points) ? data.top_bus_stop_map_points : [];
+    const specialTransitPoints = (Array.isArray(data.wce_lonsdale_stations) ? data.wce_lonsdale_stations : [])
+      .filter((point) => Number(point.uses) > 0 && typeof point.lat === 'number' && typeof point.lon === 'number')
+      .map((point) => ({
+        ...point,
+        markerType: point.type === 'seabus' ? 'seabus' : 'wce'
+      }));
     const remainingStationPoints = Array.isArray(data.remaining_station_map_points) ? data.remaining_station_map_points : [];
     const remainingBusPoints = Array.isArray(data.remaining_bus_stop_map_points) ? data.remaining_bus_stop_map_points : [];
     const initialMapPoints = [
@@ -673,14 +679,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }).addTo(map);
 
       const rankedMarkers = [];
+      const specialTransitMarkers = [];
+      let specialTransitVisible = true;
 
       const createRankedIcon = (markerType, rank) => {
         const markerSize = isPhoneMode() ? 28 : 32;
         const markerAnchor = markerSize / 2;
 
+        let markerContent = String(rank ?? '');
+        if (markerType === 'wce') markerContent = '🚆';
+        if (markerType === 'seabus') markerContent = '⛴';
+
         return L.divIcon({
         className: '',
-        html: `<div class="ranked-map-marker ${markerType}"><span>${rank}</span></div>`,
+        html: `<div class="ranked-map-marker ${markerType}"><span>${markerContent}</span></div>`,
         iconSize: [markerSize, markerSize],
         iconAnchor: [markerAnchor, markerAnchor],
         popupAnchor: [0, -markerAnchor]
@@ -688,9 +700,20 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       const markerZIndexOffset = (point) => {
-        const typeBase = point.markerType === 'station' ? 20000 : 10000;
-        return typeBase + (100 - point.rank);
+        const typeBase = point.markerType === 'station'
+          ? 22000
+          : point.markerType === 'wce' || point.markerType === 'seabus'
+            ? 16000
+            : 10000;
+        return typeBase + (100 - (point.rank || 0));
       };
+
+      const createSpecialTransitIcon = (markerType) => L.icon({
+        iconUrl: markerType === 'seabus' ? '/static/icons/seabus.svg' : '/static/icons/wce.svg',
+        iconSize: isPhoneMode() ? [28, 28] : [32, 32],
+        iconAnchor: isPhoneMode() ? [14, 14] : [16, 16],
+        popupAnchor: [0, -14]
+      });
 
       const updateOverlappingMarkerPositions = () => {
         const zoom = map.getZoom();
@@ -729,7 +752,10 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       const fitDisplayedMarkers = () => {
-        const displayedBounds = rankedMarkers.map(({ marker }) => marker.getLatLng());
+        const displayedBounds = [
+          ...rankedMarkers.filter(({ marker }) => map.hasLayer(marker)).map(({ marker }) => marker.getLatLng()),
+          ...specialTransitMarkers.filter(({ marker }) => map.hasLayer(marker)).map(({ marker }) => marker.getLatLng())
+        ];
         if (displayedBounds.length === 1) {
           map.setView(displayedBounds[0], 13);
           return;
@@ -740,13 +766,19 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       const addPointMarker = (point) => {
-        const popupTitle = point.markerType === 'station'
-          ? `Station #${point.rank}: ${point.name}`
-          : `Bus Stop #${point.rank}: ${point.name}`;
+        let popupTitle = '';
+        let popupMeta = '';
 
-        const popupMeta = point.markerType === 'station'
-          ? `Uses: ${point.count}${point.source_name ? `<br>Location source: ${point.source_name}` : ''}`
-          : `Stop #${point.stop_id}<br>Uses: ${point.count}`;
+        if (point.markerType === 'station') {
+          popupTitle = `Station #${point.rank}: ${point.name}`;
+          popupMeta = `Uses: ${point.count}${point.source_name ? `<br>Location source: ${point.source_name}` : ''}`;
+        } else if (point.markerType === 'bus') {
+          popupTitle = `Bus Stop #${point.rank}: ${point.name}`;
+          popupMeta = `Stop #${point.stop_id}<br>Uses: ${point.count}`;
+        } else {
+          popupTitle = `${point.markerType === 'seabus' ? 'SeaBus' : 'WCE'}: ${point.name}`;
+          popupMeta = `Uses: ${point.uses}`;
+        }
 
         const originalLatLng = L.latLng(point.lat, point.lon);
         const marker = L.marker(originalLatLng, {
@@ -762,6 +794,20 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       initialMapPoints.forEach(addPointMarker);
+
+      specialTransitPoints.forEach((point) => {
+        const marker = L.marker([point.lat, point.lon], {
+          icon: createSpecialTransitIcon(point.markerType),
+          zIndexOffset: markerZIndexOffset(point)
+        })
+          .addTo(map)
+          .bindPopup(
+            `<div class="map-popup-title">${point.markerType === 'seabus' ? 'SeaBus' : 'WCE'}: ${point.name}</div><div class="map-popup-meta">Uses: ${point.uses}</div>`
+          );
+
+        specialTransitMarkers.push({ marker, point });
+      });
+
       fitDisplayedMarkers();
 
       requestAnimationFrame(() => {
@@ -841,6 +887,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         updateBusButtonState();
+      }
+
+      const toggleSpecialStopsButton = $('toggleSpecialStops');
+      if (toggleSpecialStopsButton) {
+        const updateSpecialToggleButton = () => {
+          toggleSpecialStopsButton.textContent = specialTransitVisible
+            ? 'Hide SeaBus/WCE Stops'
+            : 'Reveal SeaBus/WCE Stops';
+        };
+
+        if (!specialTransitMarkers.length) {
+          toggleSpecialStopsButton.disabled = true;
+          toggleSpecialStopsButton.textContent = 'No SeaBus/WCE Stops Used';
+        } else {
+          updateSpecialToggleButton();
+          toggleSpecialStopsButton.addEventListener('click', () => {
+            specialTransitVisible = !specialTransitVisible;
+
+            specialTransitMarkers.forEach(({ marker }) => {
+              if (specialTransitVisible) {
+                marker.addTo(map);
+              } else {
+                map.removeLayer(marker);
+              }
+            });
+
+            fitDisplayedMarkers();
+            updateOverlappingMarkerPositions();
+            updateSpecialToggleButton();
+          });
+        }
       }
     }
   } catch (e) { console.error('top stops map error', e); }
@@ -1545,12 +1622,46 @@ document.addEventListener('DOMContentLoaded', () => {
     return document.getElementById(`award${type}${index}`);
   }
 
+  function getAwardIndicatorsContainer(index) {
+    return document.getElementById(`awardIndicators${index}`);
+  }
+
   function getAwardMaxIndex(track) {
     if (!track) return 0;
     const cardCount = track.children.length;
     const cardsPerPage = 2;
     const totalPages = Math.ceil(cardCount / cardsPerPage);
     return Math.max(0, totalPages - 1);
+  }
+
+  function renderAwardIndicators(index, maxIndex) {
+    const indicatorsContainer = getAwardIndicatorsContainer(index);
+    if (!indicatorsContainer) return;
+
+    const targetCount = maxIndex + 1;
+    const currentCount = indicatorsContainer.children.length;
+    if (currentCount === targetCount) return;
+
+    indicatorsContainer.innerHTML = '';
+    for (let pageIndex = 0; pageIndex <= maxIndex; pageIndex += 1) {
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'award-indicator';
+      dot.setAttribute('aria-label', `Go to award slide ${pageIndex + 1}`);
+      dot.addEventListener('click', () => {
+        window.goToAwardSlide(index, pageIndex);
+      });
+      indicatorsContainer.appendChild(dot);
+    }
+  }
+
+  function updateAwardIndicators(index, activeIndex) {
+    const indicatorsContainer = getAwardIndicatorsContainer(index);
+    if (!indicatorsContainer) return;
+
+    Array.from(indicatorsContainer.children).forEach((dot, dotIndex) => {
+      dot.classList.toggle('active', dotIndex === activeIndex);
+    });
   }
 
   function updateAwardCarousel(index) {
@@ -1572,17 +1683,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const offsetX = awardCarouselState[index] * cardsPerPage * (cardWidth + gap);
     track.style.transform = `translateX(-${offsetX}px)`;
 
+    renderAwardIndicators(index, maxIndex);
+    updateAwardIndicators(index, awardCarouselState[index]);
+
     const prevButton = getAwardButton(index, 'Prev');
     const nextButton = getAwardButton(index, 'Next');
-    if (prevButton) prevButton.disabled = awardCarouselState[index] <= 0;
-    if (nextButton) nextButton.disabled = awardCarouselState[index] >= maxIndex;
+    if (prevButton) prevButton.disabled = false;
+    if (nextButton) nextButton.disabled = false;
   }
 
+  window.goToAwardSlide = function(index, pageIndex) {
+    const track = getAwardTrack(index);
+    if (!track || !track.children.length) return;
+
+    const maxIndex = getAwardMaxIndex(track);
+    awardCarouselState[index] = Math.max(0, Math.min(pageIndex, maxIndex));
+    updateAwardCarousel(index);
+  };
+
   window.moveAwardSlide = function(index, direction) {
+    const track = getAwardTrack(index);
+    if (!track || !track.children.length) return;
+
+    const maxIndex = getAwardMaxIndex(track);
+    if (maxIndex <= 0) {
+      awardCarouselState[index] = 0;
+      updateAwardCarousel(index);
+      return;
+    }
+
     if (!Object.prototype.hasOwnProperty.call(awardCarouselState, index)) {
       awardCarouselState[index] = 0;
     }
-    awardCarouselState[index] += direction;
+
+    const loopSize = maxIndex + 1;
+    const nextIndex = awardCarouselState[index] + direction;
+    awardCarouselState[index] = ((nextIndex % loopSize) + loopSize) % loopSize;
     updateAwardCarousel(index);
   };
 

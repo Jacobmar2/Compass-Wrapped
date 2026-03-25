@@ -732,6 +732,39 @@ html {
     box-shadow: 0 2px 5px rgba(0,0,0,0.15);
 }
 
+.ssw-special-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: #ffffff;
+    color: #1f2933;
+    border: 1px solid #d8e1ea;
+}
+
+.ssw-special-list li.station-used-wce {
+    background: #d131d1;
+    color: #ffffff;
+    border-color: #d131d1;
+}
+
+.ssw-special-list li.station-used-seabus {
+    background: #B1A59E;
+    color: #ffffff;
+    border-color: #B1A59E;
+}
+
+.ssw-special-list li.station-unused {
+    background: #ffffff;
+    color: #1f2933;
+    border-color: #d8e1ea;
+}
+
+.special-uses {
+    font-weight: bold;
+    white-space: nowrap;
+}
+
 /* Sort buttons */
 .sort-buttons {
     display: flex;
@@ -822,6 +855,14 @@ html {
     background: #fed200;
 }
 
+.legend-swatch.wce {
+    background: #d131d1;
+}
+
+.legend-swatch.seabus {
+    background: #B1A59E;
+}
+
 .top-stops-map {
     width: 100%;
     aspect-ratio: 9 / 7;
@@ -880,6 +921,16 @@ html {
 
 .ranked-map-marker.bus {
     background: #fed200;
+}
+
+.ranked-map-marker.wce {
+    background: #d131d1;
+    color: #ffffff;
+}
+
+.ranked-map-marker.seabus {
+    background: #B1A59E;
+    color: #ffffff;
 }
 
 .ranked-map-marker span {
@@ -954,6 +1005,31 @@ html {
     background: #f1f4f7;
     color: #95a7b7;
     cursor: default;
+}
+
+.award-indicators {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.award-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: none;
+    background: #b6c8d8;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    display: inline-block;
+    flex: 0 0 auto;
+}
+
+.award-indicator.active {
+    background: #0059b3;
 }
 
 .award-item {
@@ -1445,6 +1521,7 @@ html {
     .unused-list {
         width: 84%;
     }
+
 }
 
 @media (max-width: 600px) {

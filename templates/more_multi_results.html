@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>More Compass Wrapped Summary</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .compare-card {
+            width: 90%;
+            max-width: 900px;
+            margin: 10px auto 20px auto;
+            text-align: center;
+        }
+
+        .compare-csv-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .compare-csv-btn {
+            margin: 0;
+            border: 2px solid rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .compare-csv-btn.is-selected {
+            background: #ffffff;
+            color: #009cde;
+            border-color: #ffffff;
+        }
+
+        .compare-reset-btn {
+            margin-top: 12px;
+            min-width: 180px;
+        }
+
+        .shared-trips-details {
+            margin-top: 12px;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .shared-trips-title {
+            margin: 0 0 10px 0;
+            font-weight: bold;
+        }
+
+        .shared-trips-table-wrap {
+            overflow: auto;
+            max-height: 600px;
+            margin-top: 6px;
+        }
+
+        .shared-trips-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.92);
+            color: #123;
+        }
+
+        .shared-trips-table th,
+        .shared-trips-table td {
+            border: 1px solid #d2e3ef;
+            padding: 8px;
+            text-align: left;
+            font-size: 0.92rem;
+            white-space: nowrap;
+        }
+
+        .shared-trips-table thead th {
+            position: sticky;
+            top: 0;
+            background: #f3f8fc;
+            z-index: 1;
+        }
+
+        .shared-trips-table tr.row-highlight-yellow td {
+            background: #fff3bf;
+        }
+
+        .pie-empty-message {
+            display: none;
+            margin: 0;
+            padding: 16px 10px;
+            color: #1b4d6f;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .hour-mobile-toggle {
+            display: none;
+            justify-content: center;
+            gap: 8px;
+            margin: 6px 0 10px 0;
+        }
+
+        .hour-mobile-toggle button {
+            border: 1px solid #b7d2e4;
+            background: #eef7ff;
+            color: #0d4f7a;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .hour-mobile-toggle button.is-active {
+            background: #009cde;
+            color: #ffffff;
+            border-color: #009cde;
+        }
+
+        @media (max-width: 900px) {
+            .carousel-viewport {
+                transition: height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+                touch-action: pan-y;
+            }
+
+            .carousel {
+                transition: transform 0.35s ease, height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+            }
+
+            .hour-mobile-toggle {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="results-card-2" id="section-summary">
+        <h1>
+            You have taken a total of
+            <span class="yellow">{{ total_trips }}</span> trips!
+        </h1>
+
+        <h2>
+            Of which <span class="yellow">{{ percent_ssw|round(1) }}%</span>
+            (<span class="yellow">{{ total_ssw_trips }}</span> trips)
+            are SkyTrain/SeaBus/WCE
+        </h2>
+
+        <p class="sub">
+            Among these trips,<br>
+            you have made:
+        </p>
+
+        <p class="breakdown">
+            <span class="skytrain">{{ total_skytrain_trips }}</span> SkyTrain trips<br>
+            <span class="seabus">{{ total_seabus_trips }}</span> SeaBus trips, and<br>
+            <span class="wce">{{ total_wce_trips }}</span> WCE trips
+        </p>
+
+        <h2>
+            Total time on SkyTrain/SeaBus/WCE: <br>
+            <span class="yellow">{{ total_days }} days,</span>
+            <span class="yellow">{{ total_hours }} hours,</span>
+            <span class="yellow">{{ total_mins }} mins</span> 
+        </h2>
+
+        <p class="sub">Based on {{ selected_count }} uploaded CSV file(s).</p>
+    </div>
+
+    <div class="carousel-container" id="more-usage-carousel">
+        <div class="carousel-viewport">
+            <div class="carousel" id="moreCarouselTrack">
+                <div class="slide">
+                    <h2>Station Usage</h2>
+                    <div class="chart-wrapper" style="height: {{ station_chart_height }}px;">
+                        <canvas id="moreStationChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="slide">
+                    <h2>Hours of the Day</h2>
+                    <div class="hour-mobile-toggle" id="hourMobileToggle">
+                        <button type="button" id="hourAmBtn">AM</button>
+                        <button type="button" id="hourPmBtn">PM</button>
+                    </div>
+                    <div class="chart-wrapper" style="height: 520px;">
+                        <canvas id="moreHourChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="slide">
+                    <h2>Days of the Week</h2>
+                    <div class="chart-wrapper" style="height: 520px;">
+                        <canvas id="moreWeekdayChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="slide">
+                    <h2>Months of the Year</h2>
+                    <div class="chart-wrapper" style="height: 520px;">
+                        <canvas id="moreMonthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="carousel-indicators" id="moreCarouselIndicators">
+            <span class="indicator active" data-index="0">●</span>
+            <span class="indicator" data-index="1">●</span>
+            <span class="indicator" data-index="2">●</span>
+            <span class="indicator" data-index="3">●</span>
+        </div>
+
+        <button class="carousel-btn left" id="moreCarouselPrev" type="button">❮</button>
+        <button class="carousel-btn right" id="moreCarouselNext" type="button">❯</button>
+    </div>
+
+    <div class="carousel-container" id="more-pie-carousel">
+        <div class="carousel-viewport">
+            <div class="carousel" id="morePieCarouselTrack">
+                <div class="slide">
+                    <h2>Total Trips by CSV</h2>
+                    <div class="chart-wrapper" style="height: 520px;">
+                        <canvas id="morePieTotalTrips"></canvas>
+                        <p id="morePieTotalTripsEmpty" class="pie-empty-message">No trips have been found in any of the uploaded files.</p>
+                    </div>
+                </div>
+
+                <div class="slide">
+                    <h2>Bus Only Trips by CSV</h2>
+                    <div class="chart-wrapper" style="height: 520px;">
+                        <canvas id="morePieBusOnly"></canvas>
+                        <p id="morePieBusOnlyEmpty" class="pie-empty-message">No bus-only trips have been found in any of the uploaded files.</p>
+                    </div>
+                </div>
+
+                <div class="slide">
+                    <h2>SkyTrain Trips by CSV</h2>
+                    <div class="chart-wrapper" style="height: 520px;">
+                        <canvas id="morePieSkytrain"></canvas>
+                        <p id="morePieSkytrainEmpty" class="pie-empty-message">No SkyTrain trips have been found in any of the uploaded files.</p>
+                    </div>
+                </div>
+
+                <div class="slide">
+                    <h2>SeaBus Trips by CSV</h2>
+                    <div class="chart-wrapper" style="height: 520px;">
+                        <canvas id="morePieSeabus"></canvas>
+                        <p id="morePieSeabusEmpty" class="pie-empty-message">No SeaBus trips have been found in any of the uploaded files.</p>
+                    </div>
+                </div>
+
+                <div class="slide">
+                    <h2>WCE Trips by CSV</h2>
+                    <div class="chart-wrapper" style="height: 520px;">
+                        <canvas id="morePieWce"></canvas>
+                        <p id="morePieWceEmpty" class="pie-empty-message">No WCE trips have been found in any of the uploaded files.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="carousel-indicators" id="morePieCarouselIndicators">
+            <span class="indicator active" data-index="0">●</span>
+            <span class="indicator" data-index="1">●</span>
+            <span class="indicator" data-index="2">●</span>
+            <span class="indicator" data-index="3">●</span>
+            <span class="indicator" data-index="4">●</span>
+        </div>
+
+        <button class="carousel-btn left" id="morePieCarouselPrev" type="button">❮</button>
+        <button class="carousel-btn right" id="morePieCarouselNext" type="button">❯</button>
+    </div>
+
+    <div class="card compare-card">
+        <h2>Compare CSV Files</h2>
+        <p class="sub">Select exactly 2 CSV files to see shared trips (same tap name within 2 minutes).</p>
+        <div id="compareCsvButtons" class="compare-csv-buttons"></div>
+        <button id="compareResetBtn" class="compare-reset-btn" type="button">Clear Selection</button>
+        <p id="compareSelectionStatus" class="sub"></p>
+
+        <div id="sharedTripsDetails" class="shared-trips-details">
+            <p id="sharedTripsSummary" class="shared-trips-title">Shared trips table will appear after selecting 2 CSV files.</p>
+            <div class="shared-trips-table-wrap">
+                <table class="shared-trips-table">
+                    <thead>
+                        <tr>
+                            <th>CSV A Station</th>
+                            <th>CSV B Station</th>
+                            <th>CSV A Tap</th>
+                            <th>CSV B Tap</th>
+                            <th>CSV A Timestamp</th>
+                            <th>CSV B Timestamp</th>
+                            <th>Difference (min)</th>
+                            <th>Match Type</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sharedTripsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <button id="downloadSharedCsvABtn" class="compare-reset-btn" type="button" style="display: none;">
+            Download Matching Taps CSV (CSV A)
+        </button>
+        <button id="downloadSharedCsvBBtn" class="compare-reset-btn" type="button" style="display: none; margin-left: 8px;">
+            Download Matching Taps CSV (CSV B)
+        </button>
+        <button id="downloadSharedCsvExactBtn" class="compare-reset-btn" type="button" style="display: none; margin-left: 8px;">
+            Download Exact Trips CSV
+        </button>
+    </div>
+
+    <div class="results-card-2" id="sharedTripsBlueCard" style="display: none;">
+        <h1>
+            Together, you have both taken a total of<br>
+            <span class="yellow" id="sharedTripsCountValue">0</span> shared trips!
+        </h1>
+        <h2>
+            Of which <span class="yellow" id="sharedTripsPercentSsw">0.0%</span>
+            (<span class="yellow" id="sharedTripsSswCount">0</span> trips)
+            are SkyTrain/SeaBus/WCE
+        </h2>
+        <p class="sub">Among these trips, you have made:</p>
+        <p class="breakdown">
+            <span class="skytrain" id="sharedTripsSkytrainCount">0</span> SkyTrain trips<br>
+            <span class="seabus" id="sharedTripsSeabusCount">0</span> SeaBus trips, and<br>
+            <span class="wce" id="sharedTripsWceCount">0</span> WCE trips
+        </p>
+        <h2>
+            Total time on SkyTrain/SeaBus/WCE: <span class="yellow" id="sharedTripsMins">0</span> mins
+        </h2>
+        <p class="sub" id="sharedTripsCombinedText">Shared trips are 0.0% of file A and 0.0% of file B.</p>
+    </div>
+
+    <a href="/more" class="button-card button-small">&laquo; Back to More Compass Wrapped</a>
+
+    <script>
+        const stationLabels = {{ station_labels|tojson }};
+        const hourLabels = {{ hour_labels|tojson }};
+        const weekdayLabels = {{ weekday_labels|tojson }};
+        const monthLabels = {{ month_labels|tojson }};
+
+        const stationDatasets = {{ station_datasets|tojson }};
+        const hourDatasets = {{ hour_datasets|tojson }};
+        const weekdayDatasets = {{ weekday_datasets|tojson }};
+        const monthDatasets = {{ month_datasets|tojson }};
+
+        const pieLabels = {{ pie_labels|tojson }};
+        const pieColors = {{ pie_colors|tojson }};
+        const pieTotalTrips = {{ pie_total_trips|tojson }};
+        const pieBusOnly = {{ pie_bus_only|tojson }};
+        const pieSkytrain = {{ pie_skytrain|tojson }};
+        const pieSeabus = {{ pie_seabus|tojson }};
+        const pieWce = {{ pie_wce|tojson }};
+        const compareTapData = {{ compare_tap_data|tojson }};
+        const sharedPairMetrics = {{ shared_pair_metrics|tojson }};
+
+        function stackedTooltipConfig() {
+            return {
+                callbacks: {
+                    label(context) {
+                        const value = Number(context.raw ?? 0);
+                        return `${context.dataset.label}: ${value}`;
+                    },
+                    footer(items) {
+                        if (!items.length) return "";
+                        const total = items.reduce((sum, item) => sum + Number(item.raw ?? 0), 0);
+                        return `Total: ${total}`;
+                    }
+                }
+            };
+        }
+
+        function baseScaleConfig(isHorizontal) {
+            if (isHorizontal) {
+                return {
+                    x: { stacked: true, beginAtZero: true },
+                    y: { stacked: true }
+                };
+            }
+            return {
+                x: { stacked: true },
+                y: { stacked: true, beginAtZero: true }
+            };
+        }
+
+        const stationTooltipCallbacks = stackedTooltipConfig().callbacks;
+        const hourAmBtn = document.getElementById("hourAmBtn");
+        const hourPmBtn = document.getElementById("hourPmBtn");
+        const isMobileView = window.matchMedia("(max-width: 900px)").matches;
+        const allHourLabels = [...hourLabels];
+        const allHourDatasets = hourDatasets.map((dataset) => ({ ...dataset, data: [...dataset.data] }));
+
+        function clearStationLabelTooltip(chart) {
+            chart.setActiveElements([]);
+            chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart.update("none");
+        }
+
+        function getClientPointFromEvent(nativeEvent) {
+            if (nativeEvent.touches && nativeEvent.touches.length) {
+                return {
+                    clientX: nativeEvent.touches[0].clientX,
+                    clientY: nativeEvent.touches[0].clientY,
+                };
+            }
+            if (nativeEvent.changedTouches && nativeEvent.changedTouches.length) {
+                return {
+                    clientX: nativeEvent.changedTouches[0].clientX,
+                    clientY: nativeEvent.changedTouches[0].clientY,
+                };
+            }
+            return {
+                clientX: nativeEvent.clientX,
+                clientY: nativeEvent.clientY,
+            };
+        }
+
+        function normalizeInteractionEvent(chart, nativeEvent) {
+            const point = getClientPointFromEvent(nativeEvent);
+            return {
+                clientX: point.clientX,
+                clientY: point.clientY,
+                target: chart.canvas,
+            };
+        }
+
+        function activateVerticalLabelTooltipForAllDatasets(chart, nativeEvent) {
+            const xScale = chart.scales.x;
+            const chartArea = chart.chartArea;
+            if (!xScale || !chartArea) {
+                return;
+            }
+
+            const chartEvent = normalizeInteractionEvent(chart, nativeEvent);
+            const barHits = chart.getElementsAtEventForMode(chartEvent, "nearest", { intersect: true }, false);
+            if (barHits.length) {
+                return;
+            }
+
+            const rect = chart.canvas.getBoundingClientRect();
+            const point = getClientPointFromEvent(nativeEvent);
+            const relX = point.clientX - rect.left;
+            const relY = point.clientY - rect.top;
+
+            const hoveringLabelArea = (
+                relX >= chartArea.left
+                && relX <= chartArea.right
+                && relY >= chartArea.bottom
+                && relY <= (xScale.bottom + 16)
+            );
+
+            if (!hoveringLabelArea) {
+                clearStationLabelTooltip(chart);
+                return;
+            }
+
+            let closestIndex = -1;
+            let closestDistance = Number.POSITIVE_INFINITY;
+            for (let i = 0; i < chart.data.labels.length; i += 1) {
+                const tickX = xScale.getPixelForTick(i);
+                const distance = Math.abs(relX - tickX);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestIndex = i;
+                }
+            }
+
+            if (closestIndex < 0) {
+                clearStationLabelTooltip(chart);
+                return;
+            }
+
+            const active = chart.data.datasets.map((_, datasetIndex) => ({ datasetIndex, index: closestIndex }));
+            chart.setActiveElements(active);
+            chart.tooltip.setActiveElements(active, {
+                x: xScale.getPixelForTick(closestIndex),
+                y: chartArea.bottom - 8,
+            });
+            chart.update("none");
+        }
+
+        function activateStationTooltipForLabelHover(chart, nativeEvent) {
+            const yScale = chart.scales.y;
+            const chartArea = chart.chartArea;
+            if (!yScale || !chartArea) {
+                return;
+            }
+
+            const chartEvent = normalizeInteractionEvent(chart, nativeEvent);
+            const barHits = chart.getElementsAtEventForMode(chartEvent, "nearest", { intersect: true }, false);
+            if (barHits.length) {
+                return;
+            }
+
+            const rect = chart.canvas.getBoundingClientRect();
+            const point = getClientPointFromEvent(nativeEvent);
+            const relX = point.clientX - rect.left;
+            const relY = point.clientY - rect.top;
+
+            const hoveringLabelArea = (
+                relX >= yScale.left
+                && relX <= chartArea.left
+                && relY >= chartArea.top
+                && relY <= chartArea.bottom
+            );
+
+            if (!hoveringLabelArea) {
+                clearStationLabelTooltip(chart);
+                return;
+            }
+
+            let closestIndex = -1;
+            let closestDistance = Number.POSITIVE_INFINITY;
+            for (let i = 0; i < chart.data.labels.length; i += 1) {
+                const tickY = yScale.getPixelForTick(i);
+                const distance = Math.abs(relY - tickY);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestIndex = i;
+                }
+            }
+
+            if (closestIndex < 0) {
+                clearStationLabelTooltip(chart);
+                return;
+            }
+
+            const active = chart.data.datasets.map((_, datasetIndex) => ({ datasetIndex, index: closestIndex }));
+            chart.setActiveElements(active);
+            chart.tooltip.setActiveElements(active, {
+                x: chartArea.left + 8,
+                y: yScale.getPixelForTick(closestIndex),
+            });
+            chart.update("none");
+        }
+
+        const stationChart = new Chart(document.getElementById("moreStationChart"), {
+            type: "bar",
+            data: { labels: stationLabels, datasets: stationDatasets },
+            options: {
+                indexAxis: "y",
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "nearest", intersect: true },
+                plugins: {
+                    tooltip: {
+                        mode: "nearest",
+                        intersect: true,
+                        callbacks: stationTooltipCallbacks,
+                    }
+                },
+                scales: baseScaleConfig(true)
+            }
+        });
+
+        stationChart.canvas.addEventListener("pointermove", (event) => {
+            activateStationTooltipForLabelHover(stationChart, event);
+        });
+        stationChart.canvas.addEventListener("click", (event) => {
+            activateStationTooltipForLabelHover(stationChart, event);
+        });
+        stationChart.canvas.addEventListener("touchstart", (event) => {
+            activateStationTooltipForLabelHover(stationChart, event);
+        }, { passive: true });
+        stationChart.canvas.addEventListener("pointerleave", () => {
+            clearStationLabelTooltip(stationChart);
+        });
+
+        const hourChart = new Chart(document.getElementById("moreHourChart"), {
+            type: "bar",
+            data: { labels: hourLabels, datasets: hourDatasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "nearest", intersect: true },
+                plugins: {
+                    tooltip: {
+                        mode: "nearest",
+                        intersect: true,
+                        callbacks: stackedTooltipConfig().callbacks,
+                    }
+                },
+                scales: baseScaleConfig(false)
+            }
+        });
+        hourChart.canvas.addEventListener("pointermove", (event) => {
+            activateVerticalLabelTooltipForAllDatasets(hourChart, event);
+        });
+        hourChart.canvas.addEventListener("click", (event) => {
+            activateVerticalLabelTooltipForAllDatasets(hourChart, event);
+        });
+        hourChart.canvas.addEventListener("touchstart", (event) => {
+            activateVerticalLabelTooltipForAllDatasets(hourChart, event);
+        }, { passive: true });
+        hourChart.canvas.addEventListener("pointerleave", () => {
+            clearStationLabelTooltip(hourChart);
+        });
+
+        function applyHourMode(mode) {
+            const isAm = mode === "am";
+            const start = isAm ? 0 : 12;
+            const end = isAm ? 12 : 24;
+
+            hourChart.data.labels = allHourLabels.slice(start, end);
+            hourChart.data.datasets = allHourDatasets.map((dataset) => ({
+                ...dataset,
+                data: dataset.data.slice(start, end),
+            }));
+            hourChart.update("none");
+
+            if (hourAmBtn && hourPmBtn) {
+                hourAmBtn.classList.toggle("is-active", isAm);
+                hourPmBtn.classList.toggle("is-active", !isAm);
+            }
+            adjustMoreCarouselHeight();
+        }
+
+        if (hourAmBtn && hourPmBtn) {
+            hourAmBtn.addEventListener("click", () => applyHourMode("am"));
+            hourPmBtn.addEventListener("click", () => applyHourMode("pm"));
+        }
+
+        const weekdayChart = new Chart(document.getElementById("moreWeekdayChart"), {
+            type: "bar",
+            data: { labels: weekdayLabels, datasets: weekdayDatasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "nearest", intersect: true },
+                plugins: {
+                    tooltip: {
+                        mode: "nearest",
+                        intersect: true,
+                        callbacks: stackedTooltipConfig().callbacks,
+                    }
+                },
+                scales: baseScaleConfig(false)
+            }
+        });
+        weekdayChart.canvas.addEventListener("pointermove", (event) => {
+            activateVerticalLabelTooltipForAllDatasets(weekdayChart, event);
+        });
+        weekdayChart.canvas.addEventListener("click", (event) => {
+            activateVerticalLabelTooltipForAllDatasets(weekdayChart, event);
+        });
+        weekdayChart.canvas.addEventListener("touchstart", (event) => {
+            activateVerticalLabelTooltipForAllDatasets(weekdayChart, event);
+        }, { passive: true });
+        weekdayChart.canvas.addEventListener("pointerleave", () => {
+            clearStationLabelTooltip(weekdayChart);
+        });
+
+        const monthChart = new Chart(document.getElementById("moreMonthChart"), {
+            type: "bar",
+            data: { labels: monthLabels, datasets: monthDatasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "nearest", intersect: true },
+                plugins: {
+                    tooltip: {
+                        mode: "nearest",
+                        intersect: true,
+                        callbacks: stackedTooltipConfig().callbacks,
+                    }
+                },
+                scales: baseScaleConfig(false)
+            }
+        });
+        monthChart.canvas.addEventListener("pointermove", (event) => {
+            activateVerticalLabelTooltipForAllDatasets(monthChart, event);
+        });
+        monthChart.canvas.addEventListener("click", (event) => {
+            activateVerticalLabelTooltipForAllDatasets(monthChart, event);
+        });
+        monthChart.canvas.addEventListener("touchstart", (event) => {
+            activateVerticalLabelTooltipForAllDatasets(monthChart, event);
+        }, { passive: true });
+        monthChart.canvas.addEventListener("pointerleave", () => {
+            clearStationLabelTooltip(monthChart);
+        });
+
+        function createPieChart(canvasId, dataValues) {
+            return new Chart(document.getElementById(canvasId), {
+                type: "pie",
+                data: {
+                    labels: pieLabels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: pieColors,
+                        borderColor: "#ffffff",
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label(context) {
+                                    const value = Number(context.raw || 0);
+                                    const total = context.dataset.data.reduce((sum, n) => sum + Number(n || 0), 0);
+                                    const pct = total ? ((value / total) * 100).toFixed(1) : "0.0";
+                                    return `${context.label}: ${value} (${pct}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function applyPieEmptyState(canvasId, dataValues) {
+            const canvas = document.getElementById(canvasId);
+            const emptyMessage = document.getElementById(`${canvasId}Empty`);
+            if (!canvas || !emptyMessage) {
+                return;
+            }
+
+            const hasData = (dataValues || []).some((value) => Number(value || 0) > 0);
+            canvas.style.display = hasData ? "block" : "none";
+            emptyMessage.style.display = hasData ? "none" : "block";
+        }
+
+        const pieChartTotalTrips = createPieChart("morePieTotalTrips", pieTotalTrips);
+        const pieChartBusOnly = createPieChart("morePieBusOnly", pieBusOnly);
+        const pieChartSkytrain = createPieChart("morePieSkytrain", pieSkytrain);
+        const pieChartSeabus = createPieChart("morePieSeabus", pieSeabus);
+        const pieChartWce = createPieChart("morePieWce", pieWce);
+
+        applyPieEmptyState("morePieTotalTrips", pieTotalTrips);
+        applyPieEmptyState("morePieBusOnly", pieBusOnly);
+        applyPieEmptyState("morePieSkytrain", pieSkytrain);
+        applyPieEmptyState("morePieSeabus", pieSeabus);
+        applyPieEmptyState("morePieWce", pieWce);
+
+        const compareCsvButtonsRoot = document.getElementById("compareCsvButtons");
+        const compareSelectionStatus = document.getElementById("compareSelectionStatus");
+        const compareResetBtn = document.getElementById("compareResetBtn");
+        const sharedTripsDetails = document.getElementById("sharedTripsDetails");
+        const sharedTripsSummary = document.getElementById("sharedTripsSummary");
+        const sharedTripsTableBody = document.getElementById("sharedTripsTableBody");
+        const downloadSharedCsvABtn = document.getElementById("downloadSharedCsvABtn");
+        const downloadSharedCsvBBtn = document.getElementById("downloadSharedCsvBBtn");
+        const downloadSharedCsvExactBtn = document.getElementById("downloadSharedCsvExactBtn");
+        const sharedTripsBlueCard = document.getElementById("sharedTripsBlueCard");
+        const sharedTripsCountValue = document.getElementById("sharedTripsCountValue");
+        const sharedTripsPercentSsw = document.getElementById("sharedTripsPercentSsw");
+        const sharedTripsSswCount = document.getElementById("sharedTripsSswCount");
+        const sharedTripsSkytrainCount = document.getElementById("sharedTripsSkytrainCount");
+        const sharedTripsSeabusCount = document.getElementById("sharedTripsSeabusCount");
+        const sharedTripsWceCount = document.getElementById("sharedTripsWceCount");
+        const sharedTripsMins = document.getElementById("sharedTripsMins");
+        const sharedTripsComparedLabel = document.getElementById("sharedTripsComparedLabel");
+        const sharedTripsCombinedText = document.getElementById("sharedTripsCombinedText");
+        const selectedCompareIndices = [];
+        const isExactlyTwoCsvs = pieLabels.length === 2;
+        let latestSharedMatches = [];
+
+        function formatTimestampForExport(isoTimestamp) {
+            const dt = new Date(isoTimestamp);
+            if (Number.isNaN(dt.getTime())) {
+                return "";
+            }
+
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const month = months[dt.getMonth()];
+            const day = String(dt.getDate()).padStart(2, "0");
+            const year = dt.getFullYear();
+
+            let hours = dt.getHours();
+            const minutes = String(dt.getMinutes()).padStart(2, "0");
+            const suffix = hours >= 12 ? "PM" : "AM";
+            hours = hours % 12;
+            if (hours === 0) hours = 12;
+
+            return `${month}-${day}-${year} ${String(hours).padStart(2, "0")}:${minutes} ${suffix}`;
+        }
+
+        function csvEscape(value) {
+            const text = String(value ?? "");
+            if (text.includes(",") || text.includes("\"") || text.includes("\n")) {
+                return `"${text.replace(/\"/g, '""')}"`;
+            }
+            return text;
+        }
+
+        function isExactSharedMatch(match) {
+            const normalizeTapKind = (kind) => {
+                if (kind === "tap_in" || kind === "transfer") {
+                    return "tap_in";
+                }
+                return kind;
+            };
+
+            return (
+                !match.a_missing
+                && !match.b_missing
+                && normalizeTapKind(match.tap_a) === normalizeTapKind(match.tap_b)
+            );
+        }
+
+        function normalizeExactExportAction(actionText) {
+            const text = String(actionText || "").trim();
+            if (/^transfer at\s+/i.test(text)) {
+                return text.replace(/^transfer at\s+/i, "Tap in at ");
+            }
+            return text;
+        }
+
+        function isTapOutKind(kind) {
+            return kind === "tap_out" || kind === "missing_out";
+        }
+
+        function isTapInKind(kind) {
+            return kind === "tap_in" || kind === "transfer" || kind === "missing_in";
+        }
+
+        function buildPartnerRowMap(events) {
+            const sortedEvents = [...events].sort((a, b) => Number(a.row_index ?? 0) - Number(b.row_index ?? 0));
+            const partnerMap = new Map();
+
+            sortedEvents.forEach((event, idx) => {
+                const rowIndex = Number(event.row_index ?? -1);
+                const tapKind = String(event.tap_kind || "");
+
+                if (isTapOutKind(tapKind)) {
+                    let partner = null;
+                    for (let j = idx + 1; j < sortedEvents.length; j += 1) {
+                        if (isTapInKind(String(sortedEvents[j].tap_kind || ""))) {
+                            partner = Number(sortedEvents[j].row_index ?? -1);
+                            break;
+                        }
+                    }
+                    partnerMap.set(rowIndex, partner);
+                    return;
+                }
+
+                if (isTapInKind(tapKind)) {
+                    let partner = null;
+                    for (let j = idx - 1; j >= 0; j -= 1) {
+                        if (isTapOutKind(String(sortedEvents[j].tap_kind || ""))) {
+                            partner = Number(sortedEvents[j].row_index ?? -1);
+                            break;
+                        }
+                    }
+                    partnerMap.set(rowIndex, partner);
+                    return;
+                }
+
+                partnerMap.set(rowIndex, null);
+            });
+
+            return partnerMap;
+        }
+
+        function annotateTripMatchStatus(matches, fileAEvents, fileBEvents) {
+            const partnerA = buildPartnerRowMap(fileAEvents || []);
+            const partnerB = buildPartnerRowMap(fileBEvents || []);
+            const lookup = new Map();
+
+            matches.forEach((match) => {
+                lookup.set(`${Number(match.row_index_a ?? -1)}|${Number(match.row_index_b ?? -1)}`, match);
+            });
+
+            matches.forEach((match) => {
+                if (!isExactSharedMatch(match)) {
+                    match.match_status = "mismatch";
+                    match.is_exact_trip = false;
+                    return;
+                }
+
+                if (match.mode === "bus") {
+                    // Bus trips are single-ended in Compass data.
+                    match.match_status = "exact_trip";
+                    match.is_exact_trip = true;
+                    return;
+                }
+
+                const rowA = Number(match.row_index_a ?? -1);
+                const rowB = Number(match.row_index_b ?? -1);
+                const partnerRowA = partnerA.get(rowA);
+                const partnerRowB = partnerB.get(rowB);
+
+                if (partnerRowA === null || partnerRowA === undefined || partnerRowB === null || partnerRowB === undefined) {
+                    match.match_status = "one_end";
+                    match.is_exact_trip = false;
+                    return;
+                }
+
+                const partnerMatch = lookup.get(`${partnerRowA}|${partnerRowB}`);
+                const isExactTrip = Boolean(partnerMatch && isExactSharedMatch(partnerMatch));
+                match.match_status = isExactTrip ? "exact_trip" : "one_end";
+                match.is_exact_trip = isExactTrip;
+            });
+
+            return matches;
+        }
+
+        function buildEventByRowMap(events) {
+            const byRow = new Map();
+            (events || []).forEach((event) => {
+                byRow.set(Number(event.row_index ?? -1), event);
+            });
+            return byRow;
+        }
+
+        function buildPairedMismatchEntries(matches, fileAEvents, fileBEvents) {
+            const partnerA = buildPartnerRowMap(fileAEvents || []);
+            const partnerB = buildPartnerRowMap(fileBEvents || []);
+            const byRowA = buildEventByRowMap(fileAEvents || []);
+            const byRowB = buildEventByRowMap(fileBEvents || []);
+            const existingKeys = new Set(
+                matches.map((match) => `${Number(match.row_index_a ?? -1)}|${Number(match.row_index_b ?? -1)}`)
+            );
+
+            const expanded = [];
+
+            matches.forEach((match) => {
+                expanded.push(match);
+
+                if (match.match_status !== "one_end" && match.match_status !== "mismatch") {
+                    return;
+                }
+
+                if (match.mode === "bus") {
+                    return;
+                }
+
+                const rowA = Number(match.row_index_a ?? -1);
+                const rowB = Number(match.row_index_b ?? -1);
+                const partnerRowA = partnerA.get(rowA);
+                const partnerRowB = partnerB.get(rowB);
+
+                const hasPartnerRows = partnerRowA !== null && partnerRowA !== undefined && partnerRowB !== null && partnerRowB !== undefined;
+                const partnerKey = hasPartnerRows ? `${Number(partnerRowA)}|${Number(partnerRowB)}` : "";
+                if (hasPartnerRows && existingKeys.has(partnerKey)) {
+                    return;
+                }
+
+                let eventA = hasPartnerRows ? byRowA.get(Number(partnerRowA)) : null;
+                let eventB = hasPartnerRows ? byRowB.get(Number(partnerRowB)) : null;
+
+                // Missing-based mismatch can be a single visible row; synthesize a paired row so yellow rows always come in twos.
+                if (!eventA && !eventB) {
+                    eventA = match.a_missing ? null : {
+                        tap_name: match.tap_name_a,
+                        tap_key: match.tap_key,
+                        mode: match.mode,
+                        is_missing: false,
+                        tap_kind: "(Missing)",
+                        timestamp: "",
+                        row_index: -1,
+                        action_text: "",
+                    };
+                    eventB = match.b_missing ? null : {
+                        tap_name: match.tap_name_b,
+                        tap_key: match.tap_key,
+                        mode: match.mode,
+                        is_missing: false,
+                        tap_kind: "(Missing)",
+                        timestamp: "",
+                        row_index: -1,
+                        action_text: "",
+                    };
+                }
+
+                let diffMin = "";
+                if (eventA?.timestamp && eventB?.timestamp) {
+                    const diffMs = Math.abs(new Date(eventA.timestamp).getTime() - new Date(eventB.timestamp).getTime());
+                    if (!Number.isNaN(diffMs)) {
+                        diffMin = (diffMs / 60000).toFixed(2);
+                    }
+                }
+
+                const pairedMismatch = {
+                    tap_name: eventA?.tap_name || eventB?.tap_name || "",
+                    tap_name_a: eventA?.tap_name || "(Missing)",
+                    tap_name_b: eventB?.tap_name || "(Missing)",
+                    tap_key: eventA?.tap_key || eventB?.tap_key || "",
+                    mode: eventA?.mode === "other" ? (eventB?.mode || "other") : (eventA?.mode || eventB?.mode || "other"),
+                    a_missing: Boolean(eventA?.is_missing),
+                    b_missing: Boolean(eventB?.is_missing),
+                    tap_a: eventA?.tap_kind || "(Missing)",
+                    tap_b: eventB?.tap_kind || "(Missing)",
+                    ts_a: eventA?.timestamp || "",
+                    ts_b: eventB?.timestamp || "",
+                    row_index_a: Number(eventA?.row_index ?? -1),
+                    row_index_b: Number(eventB?.row_index ?? -1),
+                    diff_min: diffMin,
+                    export_timestamp: eventA?.timestamp || eventB?.timestamp || "",
+                    export_action: eventA?.action_text || eventB?.action_text || "",
+                    export_timestamp_a: eventA?.timestamp || "",
+                    export_action_a: eventA?.action_text || "",
+                    export_timestamp_b: eventB?.timestamp || "",
+                    export_action_b: eventB?.action_text || "",
+                    match_status: "paired_mismatch",
+                    is_exact_trip: false,
+                };
+
+                const matchTime = new Date(match.ts_a || match.ts_b || "").getTime();
+                const pairedTime = new Date(pairedMismatch.ts_a || pairedMismatch.ts_b || "").getTime();
+                if (!Number.isNaN(matchTime) && !Number.isNaN(pairedTime) && pairedTime > matchTime) {
+                    expanded.pop();
+                    expanded.push(pairedMismatch);
+                    expanded.push(match);
+                } else {
+                    expanded.push(pairedMismatch);
+                }
+                if (hasPartnerRows) {
+                    existingKeys.add(partnerKey);
+                }
+            });
+
+            return expanded;
+        }
+
+        function buildSharedCsvLines(matches, side = "a", exactOnly = false) {
+            const selectedMatches = exactOnly ? matches.filter((match) => Boolean(match.is_exact_trip)) : matches;
+            if (!selectedMatches.length) {
+                return [];
+            }
+
+            const lines = ["DateTime,Transaction"];
+            selectedMatches.forEach((match) => {
+                const sideTimestamp = side === "b" ? match.export_timestamp_b : match.export_timestamp_a;
+                let sideAction = side === "b" ? match.export_action_b : match.export_action_a;
+                if (exactOnly) {
+                    sideAction = normalizeExactExportAction(sideAction);
+                }
+                const ts = formatTimestampForExport(sideTimestamp);
+                const tx = sideAction || "";
+                lines.push(`${csvEscape(ts)},${csvEscape(tx)}`);
+            });
+
+            return lines;
+        }
+
+        function downloadSharedMatchesCsv(side = "a", exactOnly = false) {
+            const lines = buildSharedCsvLines(latestSharedMatches, side, exactOnly);
+            if (!lines.length) {
+                return;
+            }
+
+            const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            if (exactOnly) {
+                anchor.download = "matching_taps_exact_only.csv";
+            } else if (side === "b") {
+                anchor.download = "matching_taps_file_b.csv";
+            } else {
+                anchor.download = "matching_taps_file_a.csv";
+            }
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            URL.revokeObjectURL(url);
+        }
+
+        function computeSharedMinutes(matches, fileA, fileB) {
+            const completeA = (fileA.complete_trips || []).map((trip) => ({ ...trip, _used: false }));
+            const completeB = (fileB.complete_trips || []).map((trip) => ({ ...trip, _used: false }));
+
+            const findBestTrip = (trips, tapKey, mode, targetTs) => {
+                const targetMs = new Date(targetTs).getTime();
+                let best = null;
+                let bestDiff = Number.POSITIVE_INFINITY;
+
+                trips.forEach((trip) => {
+                    if (trip._used) return;
+                    if (trip.tap_key !== tapKey || trip.mode !== mode) return;
+
+                    const diff = Math.abs(new Date(trip.timestamp).getTime() - targetMs);
+                    if (diff <= 120000 && diff < bestDiff) {
+                        best = trip;
+                        bestDiff = diff;
+                    }
+                });
+
+                return best;
+            };
+
+            let total = 0;
+            matches.forEach((match) => {
+                if (!["skytrain", "seabus", "wce"].includes(match.mode)) {
+                    return;
+                }
+
+                const tripA = findBestTrip(completeA, match.tap_key, match.mode, match.ts_a);
+                const tripB = findBestTrip(completeB, match.tap_key, match.mode, match.ts_b);
+
+                if (tripA && tripB) {
+                    tripA._used = true;
+                    tripB._used = true;
+                    total += (Number(tripA.duration_min) + Number(tripB.duration_min)) / 2;
+                    return;
+                }
+
+                if (match.a_missing && tripB) {
+                    tripB._used = true;
+                    total += Number(tripB.duration_min);
+                    return;
+                }
+
+                if (match.b_missing && tripA) {
+                    tripA._used = true;
+                    total += Number(tripA.duration_min);
+                }
+            });
+
+            return Math.round(total);
+        }
+
+        function buildSharedTripMatches(fileAEvents, fileBEvents) {
+            const groupedA = new Map();
+            const groupedB = new Map();
+
+            const tapPhase = (event) => {
+                if (event.tap_kind === "tap_in" || event.tap_kind === "transfer" || event.tap_kind === "missing_in") {
+                    return "in";
+                }
+                if (event.tap_kind === "tap_out" || event.tap_kind === "missing_out") {
+                    return "out";
+                }
+                return "other";
+            };
+
+            const groupKey = (event) => `${event.tap_key}::${tapPhase(event)}`;
+
+            fileAEvents.forEach((event) => {
+                const key = groupKey(event);
+                if (!groupedA.has(key)) groupedA.set(key, []);
+                groupedA.get(key).push(event);
+            });
+            fileBEvents.forEach((event) => {
+                const key = groupKey(event);
+                if (!groupedB.has(key)) groupedB.set(key, []);
+                groupedB.get(key).push(event);
+            });
+
+            const matches = [];
+            groupedA.forEach((eventsA, combinedKey) => {
+                const eventsB = groupedB.get(combinedKey);
+                if (!eventsB || !eventsB.length) return;
+
+                const sortedA = [...eventsA].sort((a, b) => {
+                    const timeCompare = a.timestamp.localeCompare(b.timestamp);
+                    if (timeCompare !== 0) {
+                        return timeCompare;
+                    }
+                    return Number(a.row_index ?? 0) - Number(b.row_index ?? 0);
+                });
+                const sortedB = [...eventsB].sort((a, b) => {
+                    const timeCompare = a.timestamp.localeCompare(b.timestamp);
+                    if (timeCompare !== 0) {
+                        return timeCompare;
+                    }
+                    return Number(a.row_index ?? 0) - Number(b.row_index ?? 0);
+                });
+
+                let i = 0;
+                let j = 0;
+                while (i < sortedA.length && j < sortedB.length) {
+                    const tA = new Date(sortedA[i].timestamp).getTime();
+                    const tB = new Date(sortedB[j].timestamp).getTime();
+                    const diffMs = Math.abs(tA - tB);
+                    const eventA = sortedA[i];
+                    const eventB = sortedB[j];
+
+                    if (diffMs <= 120000) {
+                        const mode = eventA.mode === "other" ? eventB.mode : eventA.mode;
+                        const [tapKey] = combinedKey.split("::");
+
+                        matches.push({
+                            tap_name: eventA.tap_name,
+                            tap_name_a: eventA.tap_name,
+                            tap_name_b: eventB.tap_name,
+                            tap_key: tapKey,
+                            mode,
+                            a_missing: Boolean(eventA.is_missing),
+                            b_missing: Boolean(eventB.is_missing),
+                            tap_a: eventA.tap_kind,
+                            tap_b: eventB.tap_kind,
+                            ts_a: eventA.timestamp,
+                            ts_b: eventB.timestamp,
+                            row_index_a: Number(eventA.row_index ?? 0),
+                            row_index_b: Number(eventB.row_index ?? 0),
+                            diff_min: (diffMs / 60000).toFixed(2),
+                            export_timestamp: eventA.is_missing ? eventB.timestamp : eventA.timestamp,
+                            export_action: eventA.is_missing ? eventB.action_text : eventA.action_text,
+                            export_timestamp_a: eventA.timestamp,
+                            export_action_a: eventA.action_text,
+                            export_timestamp_b: eventB.timestamp,
+                            export_action_b: eventB.action_text,
+                        });
+                        i += 1;
+                        j += 1;
+                    } else if (tA < tB) {
+                        i += 1;
+                    } else {
+                        j += 1;
+                    }
+                }
+            });
+
+            matches.sort((a, b) => {
+                const timeCompare = b.ts_a.localeCompare(a.ts_a);
+                if (timeCompare !== 0) {
+                    return timeCompare;
+                }
+                return Number(a.row_index_a ?? 0) - Number(b.row_index_a ?? 0);
+            });
+            return matches;
+        }
+
+        function renderSharedTrips() {
+            sharedTripsTableBody.innerHTML = "";
+
+            if (selectedCompareIndices.length !== 2) {
+                sharedTripsSummary.textContent = "Shared trips table will appear after selecting 2 CSV files.";
+                sharedTripsBlueCard.style.display = "none";
+                latestSharedMatches = [];
+                downloadSharedCsvABtn.style.display = "none";
+                downloadSharedCsvBBtn.style.display = "none";
+                downloadSharedCsvExactBtn.style.display = "none";
+                return;
+            }
+
+            const [aIndex, bIndex] = selectedCompareIndices;
+            const fileA = compareTapData[aIndex];
+            const fileB = compareTapData[bIndex];
+            const matches = buildSharedTripMatches(fileA.events || [], fileB.events || []);
+            annotateTripMatchStatus(matches, fileA.events || [], fileB.events || []);
+            latestSharedMatches = buildPairedMismatchEntries(matches, fileA.events || [], fileB.events || []);
+            const fileATrips = Number(pieTotalTrips[aIndex] || 0);
+            const fileBTrips = Number(pieTotalTrips[bIndex] || 0);
+            const pairKey = aIndex < bIndex ? `${aIndex}-${bIndex}` : `${bIndex}-${aIndex}`;
+            const pairStats = sharedPairMetrics[pairKey] || {
+                trips: 0,
+                ssw_trips: 0,
+                skytrain_trips: 0,
+                seabus_trips: 0,
+                wce_trips: 0,
+                percent_ssw: 0,
+                minutes: 0,
+            };
+            const sharedTrips = Number(pairStats.trips || 0);
+            const exactPctA = fileATrips ? ((sharedTrips / fileATrips) * 100).toFixed(1) : "0.0";
+            const exactPctB = fileBTrips ? ((sharedTrips / fileBTrips) * 100).toFixed(1) : "0.0";
+
+            sharedTripsSummary.textContent = `Shared trips (${latestSharedMatches.length} rows) | CSV A: ${fileA.label} | CSV B: ${fileB.label}`;
+
+            sharedTripsBlueCard.style.display = "block";
+            sharedTripsCountValue.textContent = String(pairStats.trips || 0);
+            sharedTripsPercentSsw.textContent = `${Number(pairStats.percent_ssw || 0).toFixed(1)}%`;
+            sharedTripsSswCount.textContent = String(pairStats.ssw_trips || 0);
+            sharedTripsSkytrainCount.textContent = String(pairStats.skytrain_trips || 0);
+            sharedTripsSeabusCount.textContent = String(pairStats.seabus_trips || 0);
+            sharedTripsWceCount.textContent = String(pairStats.wce_trips || 0);
+            sharedTripsMins.textContent = String(pairStats.minutes || 0);
+            sharedTripsCombinedText.textContent = `Exact shared trips are ${exactPctA}% of CSV A and ${exactPctB}% of CSV B.`;
+
+            if (!latestSharedMatches.length) {
+                const emptyRow = document.createElement("tr");
+                const emptyCell = document.createElement("td");
+                emptyCell.colSpan = 8;
+                emptyCell.textContent = "no shared trips found.";
+                emptyRow.appendChild(emptyCell);
+                sharedTripsTableBody.appendChild(emptyRow);
+                downloadSharedCsvABtn.style.display = "none";
+                downloadSharedCsvBBtn.style.display = "none";
+                downloadSharedCsvExactBtn.style.display = "none";
+                return;
+            }
+
+            downloadSharedCsvABtn.style.display = "inline-block";
+            downloadSharedCsvBBtn.style.display = "inline-block";
+            downloadSharedCsvExactBtn.style.display = latestSharedMatches.some((match) => Boolean(match.is_exact_trip)) ? "inline-block" : "none";
+
+            latestSharedMatches.forEach((match) => {
+                const row = document.createElement("tr");
+                if (
+                    match.match_status === "one_end"
+                    || match.match_status === "paired_mismatch"
+                    || match.match_status === "mismatch"
+                ) {
+                    if (match.mode === "bus") {
+                        return;
+                    }
+                    row.classList.add("row-highlight-yellow");
+                }
+
+                const stationACell = document.createElement("td");
+                const stationBCell = document.createElement("td");
+                stationACell.textContent = match.tap_name_a || "(Missing)";
+                stationBCell.textContent = match.tap_name_b || "(Missing)";
+
+                if (match.a_missing || match.b_missing || stationACell.textContent !== stationBCell.textContent) {
+                    stationACell.title = "One side is missing or station names differ.";
+                    stationBCell.title = "One side is missing or station names differ.";
+                }
+
+                const tapACell = document.createElement("td");
+                tapACell.textContent = match.tap_a;
+
+                const tapBCell = document.createElement("td");
+                tapBCell.textContent = match.tap_b;
+
+                const aCell = document.createElement("td");
+                aCell.textContent = match.ts_a ? new Date(match.ts_a).toLocaleString() : "(Missing)";
+
+                const bCell = document.createElement("td");
+                bCell.textContent = match.ts_b ? new Date(match.ts_b).toLocaleString() : "(Missing)";
+
+                const diffCell = document.createElement("td");
+                diffCell.textContent = match.diff_min || "";
+
+                const statusCell = document.createElement("td");
+                if (match.match_status === "exact_trip") {
+                    statusCell.textContent = "Exact Trip";
+                } else if (match.match_status === "one_end") {
+                    statusCell.textContent = "One-End Match (other end mismatch/missing)";
+                } else if (match.match_status === "paired_mismatch") {
+                    statusCell.textContent = "Paired Endpoint Mismatch";
+                } else {
+                    statusCell.textContent = "Tap Mismatch";
+                }
+
+                row.appendChild(stationACell);
+                row.appendChild(stationBCell);
+                row.appendChild(tapACell);
+                row.appendChild(tapBCell);
+                row.appendChild(aCell);
+                row.appendChild(bCell);
+                row.appendChild(diffCell);
+                row.appendChild(statusCell);
+                sharedTripsTableBody.appendChild(row);
+            });
+        }
+
+        function applyCompareSelection() {
+            const btns = Array.from(compareCsvButtonsRoot.querySelectorAll(".compare-csv-btn"));
+            btns.forEach((btn) => {
+                const idx = Number(btn.dataset.fileIndex);
+                btn.classList.toggle("is-selected", selectedCompareIndices.includes(idx));
+            });
+
+            if (!selectedCompareIndices.length) {
+                compareSelectionStatus.textContent = "Select 2 files to generate shared-trip matches.";
+            } else {
+                const [aIndex, bIndex] = selectedCompareIndices;
+                if (aIndex !== undefined && bIndex !== undefined) {
+                    compareSelectionStatus.textContent = `CSV A: ${pieLabels[aIndex]} | CSV B: ${pieLabels[bIndex]}`;
+                } else {
+                    const names = selectedCompareIndices.map((index) => pieLabels[index]).join(" and ");
+                    compareSelectionStatus.textContent = `Selected: ${names}`;
+                }
+            }
+
+            renderSharedTrips();
+            adjustMoreCarouselHeight();
+            adjustPieCarouselHeight();
+        }
+
+        function toggleCompareFile(index) {
+            const existingIndex = selectedCompareIndices.indexOf(index);
+            if (existingIndex >= 0) {
+                selectedCompareIndices.splice(existingIndex, 1);
+            } else if (selectedCompareIndices.length < 2) {
+                selectedCompareIndices.push(index);
+            } else {
+                selectedCompareIndices.shift();
+                selectedCompareIndices.push(index);
+            }
+            applyCompareSelection();
+        }
+
+        pieLabels.forEach((label, index) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "compare-csv-btn";
+            button.dataset.fileIndex = String(index);
+            button.textContent = label;
+            button.addEventListener("click", () => toggleCompareFile(index));
+            compareCsvButtonsRoot.appendChild(button);
+        });
+
+        if (isExactlyTwoCsvs) {
+            compareCsvButtonsRoot.style.display = "none";
+            compareResetBtn.style.display = "none";
+            selectedCompareIndices.push(0, 1);
+            compareSelectionStatus.textContent = `Auto comparing. CSV A: ${pieLabels[0]} | CSV B: ${pieLabels[1]}`;
+        }
+
+        compareResetBtn.addEventListener("click", () => {
+            selectedCompareIndices.length = 0;
+            applyCompareSelection();
+        });
+
+        downloadSharedCsvABtn.addEventListener("click", () => downloadSharedMatchesCsv("a", false));
+        downloadSharedCsvBBtn.addEventListener("click", () => downloadSharedMatchesCsv("b", false));
+        downloadSharedCsvExactBtn.addEventListener("click", () => downloadSharedMatchesCsv("a", true));
+
+        const moreTrack = document.getElementById("moreCarouselTrack");
+        const moreViewport = document.querySelector("#more-usage-carousel .carousel-viewport");
+        const moreSlides = Array.from(moreTrack.querySelectorAll(".slide"));
+        const moreIndicators = Array.from(document.querySelectorAll("#moreCarouselIndicators .indicator"));
+        const slideCount = 4;
+        let moreIndex = 0;
+
+        function adjustMoreCarouselHeight() {
+            const activeSlide = moreSlides[moreIndex];
+            if (!activeSlide) return;
+
+            const targetHeight = Math.ceil(activeSlide.offsetHeight);
+            moreTrack.style.height = `${targetHeight}px`;
+            if (moreViewport) {
+                moreViewport.style.height = `${targetHeight}px`;
+            }
+        }
+
+        function renderMoreSlide() {
+            moreTrack.style.transform = `translateX(-${moreIndex * 100}%)`;
+            moreIndicators.forEach((dot, idx) => dot.classList.toggle("active", idx === moreIndex));
+            adjustMoreCarouselHeight();
+        }
+
+        function enableCarouselSwipe(viewport, getIndex, setIndex, maxCount, renderFn) {
+            if (!viewport) return;
+
+            let startX = 0;
+            let startY = 0;
+            let deltaX = 0;
+            let isTracking = false;
+            let isHorizontalSwipe = false;
+
+            const resetSwipe = () => {
+                isTracking = false;
+                isHorizontalSwipe = false;
+                deltaX = 0;
+                viewport.classList.remove("is-swiping");
+            };
+
+            viewport.addEventListener("touchstart", (event) => {
+                if (!event.touches.length) return;
+                const touch = event.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                deltaX = 0;
+                isTracking = true;
+                isHorizontalSwipe = false;
+            }, { passive: true });
+
+            viewport.addEventListener("touchmove", (event) => {
+                if (!isTracking || !event.touches.length) return;
+                const touch = event.touches[0];
+                const moveX = touch.clientX;
+                const moveY = touch.clientY;
+                deltaX = moveX - startX;
+                const deltaY = moveY - startY;
+
+                if (!isHorizontalSwipe) {
+                    if (Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY)) {
+                        isHorizontalSwipe = true;
+                        viewport.classList.add("is-swiping");
+                    }
+                }
+
+                if (isHorizontalSwipe) {
+                    event.preventDefault();
+                }
+            }, { passive: false });
+
+            viewport.addEventListener("touchend", () => {
+                if (!isTracking) {
+                    resetSwipe();
+                    return;
+                }
+
+                if (isHorizontalSwipe && Math.abs(deltaX) > 40) {
+                    const currentIndex = getIndex();
+                    const nextIndex = deltaX < 0
+                        ? (currentIndex + 1) % maxCount
+                        : (currentIndex - 1 + maxCount) % maxCount;
+                    setIndex(nextIndex);
+                    renderFn();
+                }
+
+                resetSwipe();
+            }, { passive: true });
+
+            viewport.addEventListener("touchcancel", resetSwipe, { passive: true });
+        }
+
+        document.getElementById("moreCarouselPrev").addEventListener("click", () => {
+            moreIndex = (moreIndex - 1 + slideCount) % slideCount;
+            renderMoreSlide();
+        });
+
+        document.getElementById("moreCarouselNext").addEventListener("click", () => {
+            moreIndex = (moreIndex + 1) % slideCount;
+            renderMoreSlide();
+        });
+
+        moreIndicators.forEach((dot) => {
+            dot.addEventListener("click", () => {
+                moreIndex = Number(dot.dataset.index || 0);
+                renderMoreSlide();
+            });
+        });
+
+        enableCarouselSwipe(
+            moreViewport,
+            () => moreIndex,
+            (value) => { moreIndex = value; },
+            slideCount,
+            renderMoreSlide,
+        );
+
+        const pieTrack = document.getElementById("morePieCarouselTrack");
+        const pieViewport = document.querySelector("#more-pie-carousel .carousel-viewport");
+        const pieSlides = Array.from(pieTrack.querySelectorAll(".slide"));
+        const pieIndicators = Array.from(document.querySelectorAll("#morePieCarouselIndicators .indicator"));
+        const pieSlideCount = 5;
+        let pieIndex = 0;
+
+        function adjustPieCarouselHeight() {
+            const activeSlide = pieSlides[pieIndex];
+            if (!activeSlide) return;
+
+            const targetHeight = Math.ceil(activeSlide.offsetHeight);
+            pieTrack.style.height = `${targetHeight}px`;
+            if (pieViewport) {
+                pieViewport.style.height = `${targetHeight}px`;
+            }
+        }
+
+        function renderPieSlide() {
+            pieTrack.style.transform = `translateX(-${pieIndex * 100}%)`;
+            pieIndicators.forEach((dot, idx) => dot.classList.toggle("active", idx === pieIndex));
+            adjustPieCarouselHeight();
+        }
+
+        document.getElementById("morePieCarouselPrev").addEventListener("click", () => {
+            pieIndex = (pieIndex - 1 + pieSlideCount) % pieSlideCount;
+            renderPieSlide();
+        });
+
+        document.getElementById("morePieCarouselNext").addEventListener("click", () => {
+            pieIndex = (pieIndex + 1) % pieSlideCount;
+            renderPieSlide();
+        });
+
+        pieIndicators.forEach((dot) => {
+            dot.addEventListener("click", () => {
+                pieIndex = Number(dot.dataset.index || 0);
+                renderPieSlide();
+            });
+        });
+
+        enableCarouselSwipe(
+            pieViewport,
+            () => pieIndex,
+            (value) => { pieIndex = value; },
+            pieSlideCount,
+            renderPieSlide,
+        );
+
+        window.addEventListener("resize", () => {
+            adjustMoreCarouselHeight();
+            adjustPieCarouselHeight();
+        });
+
+        if (hourAmBtn && hourPmBtn && isMobileView) {
+            applyHourMode("am");
+        }
+
+        setTimeout(adjustMoreCarouselHeight, 0);
+        setTimeout(adjustPieCarouselHeight, 0);
+        renderMoreSlide();
+        renderPieSlide();
+        applyCompareSelection();
+    </script>
+</body>
+</html>

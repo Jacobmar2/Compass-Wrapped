@@ -12,6 +12,21 @@
             margin-top: 1em;
         }
 
+        .multi-csv-dropzone {
+            border: 2px dashed #ffffff;
+            border-radius: 10px;
+            padding: 14px;
+            margin: 1em auto 0.6em auto;
+            max-width: 560px;
+            text-align: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .multi-csv-dropzone.drag-active {
+            background-color: rgba(255, 255, 255, 0.16);
+            border-color: #d6efff;
+        }
+
         .multi-csv-actions {
             display: flex;
             justify-content: center;
@@ -86,6 +101,9 @@
         <h2>Upload multiple CSV's</h2>
         <form id="multi-csv-form" method="POST" action="/more/upload-multiple" enctype="multipart/form-data">
             <input id="multi-csv-input" type="file" name="files" accept=".csv" multiple style="display: none;">
+            <div id="multi-csv-dropzone" class="multi-csv-dropzone">
+                Drag & drop CSV files here
+            </div>
             <div class="multi-csv-controls">
                 <button id="multi-csv-add-btn" type="button">Browse...</button>
             </div>
@@ -111,6 +129,7 @@
     <script>
         const multiCsvForm = document.getElementById("multi-csv-form");
         const multiCsvInput = document.getElementById("multi-csv-input");
+        const multiCsvDropzone = document.getElementById("multi-csv-dropzone");
         const multiCsvAddBtn = document.getElementById("multi-csv-add-btn");
         const multiCsvRemoveBtn = document.getElementById("multi-csv-remove-btn");
         const multiCsvSelected = document.getElementById("multi-csv-selected");
@@ -126,6 +145,25 @@
             const dataTransfer = new DataTransfer();
             selectedFiles.forEach((file) => dataTransfer.items.add(file));
             multiCsvInput.files = dataTransfer.files;
+        }
+
+        function addIncomingFiles(incomingFiles) {
+            const existingKeys = new Set(selectedFiles.map(fileKey));
+
+            incomingFiles.forEach((file) => {
+                if (!file.name.toLowerCase().endsWith(".csv")) {
+                    return;
+                }
+
+                const key = fileKey(file);
+                if (!existingKeys.has(key)) {
+                    selectedFiles.push(file);
+                    existingKeys.add(key);
+                }
+            });
+
+            syncInputFiles();
+            renderSelectedFiles();
         }
 
         function renderSelectedFiles() {
@@ -171,19 +209,29 @@
 
         multiCsvInput.addEventListener("change", () => {
             const incomingFiles = Array.from(multiCsvInput.files || []);
-            const existingKeys = new Set(selectedFiles.map(fileKey));
-
-            incomingFiles.forEach((file) => {
-                const key = fileKey(file);
-                if (!existingKeys.has(key)) {
-                    selectedFiles.push(file);
-                    existingKeys.add(key);
-                }
-            });
-
-            syncInputFiles();
-            renderSelectedFiles();
+            addIncomingFiles(incomingFiles);
             multiCsvInput.value = "";
+        });
+
+        ["dragenter", "dragover"].forEach((eventName) => {
+            multiCsvDropzone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                multiCsvDropzone.classList.add("drag-active");
+            });
+        });
+
+        ["dragleave", "drop"].forEach((eventName) => {
+            multiCsvDropzone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                multiCsvDropzone.classList.remove("drag-active");
+            });
+        });
+
+        multiCsvDropzone.addEventListener("drop", (event) => {
+            const droppedFiles = Array.from(event.dataTransfer.files || []);
+            addIncomingFiles(droppedFiles);
         });
 
         multiCsvRemoveBtn.addEventListener("click", () => {
@@ -193,9 +241,9 @@
         });
 
         multiCsvForm.addEventListener("submit", (event) => {
-            if (!selectedFiles.length) {
+            if (selectedFiles.length < 2) {
                 event.preventDefault();
-                multiCsvSelected.textContent = "Please add at least one CSV file.";
+                multiCsvSelected.textContent = "Please add at least two CSV files.";
                 return;
             }
 

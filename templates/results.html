@@ -290,11 +290,19 @@
         <h2>Your Transit Map</h2>
         {% if topStationMapPoints or topBusStopMapPoints or wceLonsdaleStations %}
         <p class="map-subtitle">Top 5 SkyTrain stations and top 10 bus stops, ranked and numbered.</p>
+        {% set ns = namespace(hasSpecialUsage=false) %}
+        {% for stop in wceLonsdaleStations %}
+            {% if stop.uses > 0 %}
+                {% set ns.hasSpecialUsage = true %}
+            {% endif %}
+        {% endfor %}
         <div class="map-legend">
             <div class="legend-item"><span class="legend-swatch station"></span>SkyTrain stations</div>
             <div class="legend-item"><span class="legend-swatch bus"></span>Bus stops</div>
-            <div class="legend-item"><span class="legend-swatch wce"></span>WCE used stops</div>
-            <div class="legend-item"><span class="legend-swatch seabus"></span>SeaBus used stops</div>
+            {% if ns.hasSpecialUsage %}
+            <div class="legend-item"><span class="legend-swatch wce"></span>WCE stops</div>
+            <div class="legend-item"><span class="legend-swatch seabus"></span>SeaBus terminal</div>
+            {% endif %}
         </div>
         <div id="topStopsMap" class="top-stops-map"></div>
         {% if remainingStationMapPoints or remainingBusStopMapPoints or wceLonsdaleStations %}

@@ -23,6 +23,659 @@ TIMESTAMP_FORMAT = "%b-%d-%Y %I:%M %p"
 WCE_TERMINAL_STATION_KEYS = {"waterfront", "moody center"}
 
 
+def parse_uploaded_csv_rows(uploaded_file):
+    uploaded_file.stream.seek(0)
+    text_stream = uploaded_file.stream.read().decode("utf-8").splitlines()
+    reader = csv.reader(text_stream)
+    rows = list(reader)
+    uploaded_file.stream.seek(0)
+    return rows
+
+
+def calculate_summary_metrics_from_rows(rows):
+    if len(rows) <= 1:
+        return {
+            "trips": 0,
+            "ssw_trips": 0,
+            "skytrain_trips": 0,
+            "seabus_trips": 0,
+            "wce_trips": 0,
+        }
+
+    trips = []
+    for row in rows[1:]:  # skip header row
+        if len(row) < 2 or str(row[1]).strip() == "":
+            break
+        trips.append(str(row[1]).strip())
+
+    trips = utils.remove_refund_pairs(trips)
+
+    sswtaps = [
+        stop for stop in trips
+        if "Bus Stop" not in stop and "Loaded" not in stop and "SV" not in stop and "COS" not in stop and "Purchase" not in stop
+    ]
+    ssw_bus_taps = [
+        stop for stop in trips
+        if "Loaded" not in stop and "SV" not in stop and "COS" not in stop and "Purchase" not in stop
+    ]
+
+    ssw_trips_num = len(sswtaps) / 2
+    ssw_bus_taps_num = len(ssw_bus_taps) - len(sswtaps)
+    trips_num = ssw_bus_taps_num + ssw_trips_num
+
+    ssw_tap_names = utils.ProcessList(sswtaps)
+    seabus_with_skytrain = []
+    for i in range(0, len(ssw_tap_names), 2):
+        first = ssw_tap_names[i]
+        second = ssw_tap_names[i + 1] if i + 1 < len(ssw_tap_names) else ""
+
+        if (
+            ("Lonsdale" in first or "Lonsdale" in second)
+            and "Waterfront" not in first and "Waterfront" not in second
+            and "Missing" not in first and "Missing" not in second
+        ):
+            seabus_with_skytrain.append((first, second))
+
+    trips_num += len(seabus_with_skytrain)
+    ssw_trips_num += len(seabus_with_skytrain)
+
+    skytrain_trips_num = 0
+    seabus_trips_num = 0
+    wce_trips_num = 0
+
+    for stop in ssw_tap_names:
+        if stop.endswith("Stn"):
+            skytrain_trips_num += 1
+        elif stop.endswith("Quay"):
+            seabus_trips_num += 1
+        elif stop.endswith("Station") or stop.endswith("Stn - WCE"):
+            wce_trips_num += 1
+
+    for i in range(0, len(ssw_tap_names), 2):
+        first = ssw_tap_names[i]
+        second = ssw_tap_names[i + 1] if i + 1 < len(ssw_tap_names) else ""
+
+        if "Missing" in first:
+            other = second
+        elif "Missing" in second:
+            other = first
+        else:
+            continue
+
+        if other.endswith("Stn") or other.endswith("Quay"):
+            skytrain_trips_num += 1
+        elif other.endswith("Station") or other.endswith("Stn - WCE"):
+            wce_trips_num += 1
+
+    for i in range(1, len(ssw_tap_names)):
+        if "Waterfront Stn - WCE" in ssw_tap_names[i] and "Transfer" in sswtaps[i]:
+            skytrain_trips_num, trips_num, ssw_trips_num, wce_trips_num = utils.adjust_wce_eastbound(
+                ssw_tap_names, i, skytrain_trips_num, trips_num, ssw_trips_num, wce_trips_num
+            )
+        elif "Moody" in ssw_tap_names[i] and "Station" in ssw_tap_names[i] and "Transfer" in sswtaps[i]:
+            skytrain_trips_num, trips_num, ssw_trips_num, wce_trips_num = utils.adjust_wce_westbound(
+                ssw_tap_names, i, skytrain_trips_num, trips_num, ssw_trips_num, wce_trips_num
+            )
+
+    skytrain_trips_num += 2 * len(seabus_with_skytrain) - seabus_trips_num
+    skytrain_trips_num /= 2
+    wce_trips_num /= 2
+
+    return {
+        "trips": int(trips_num),
+        "ssw_trips": int(ssw_trips_num),
+        "skytrain_trips": int(round(skytrain_trips_num)),
+        "seabus_trips": int(seabus_trips_num),
+        "wce_trips": int(round(wce_trips_num)),
+    }
+
+
+def calculate_minutes_from_rows(rows):
+    if len(rows) <= 2:
+        return 0.0
+
+    total_minutes = 0.0
+    data = rows[1:]
+
+    for i in range(len(data) - 1):
+        if len(data[i]) < 2 or len(data[i + 1]) < 1:
+            continue
+
+        timestamp = str(data[i][0]).strip()
+        action = str(data[i][1]).strip().lower()
+        next_timestamp = str(data[i + 1][0]).strip()
+
+        if not timestamp or not next_timestamp:
+            continue
+
+        if "out" in action and "missing" not in action:
+            try:
+                ts_out = datetime.strptime(timestamp, TIMESTAMP_FORMAT)
+                ts_in = datetime.strptime(next_timestamp, TIMESTAMP_FORMAT)
+            except ValueError:
+                continue
+
+            diff_minutes = (ts_out - ts_in).total_seconds() / 60
+            if diff_minutes > 0:
+                total_minutes += diff_minutes
+
+    return round(total_minutes, 1)
+
+
+def format_duration_days_hours_minutes(total_minutes):
+    total_minutes_int = int(round(total_minutes))
+    days, remaining_minutes = divmod(total_minutes_int, 24 * 60)
+    hours, minutes = divmod(remaining_minutes, 60)
+    return days, hours, minutes
+
+
+def build_usage_breakdowns_from_rows(rows):
+    if len(rows) <= 1:
+        return {
+            "station_counts": {},
+            "hour_counts": [0] * 24,
+            "weekday_counts": [0] * 7,
+            "month_counts": [0] * 12,
+        }
+
+    trips = []
+    for row in rows[1:]:
+        if len(row) < 2 or str(row[1]).strip() == "":
+            break
+        trips.append(str(row[1]).strip())
+
+    trips = utils.remove_refund_pairs(trips)
+    sswtaps = [
+        stop for stop in trips
+        if "Bus Stop" not in stop and "Loaded" not in stop and "SV" not in stop and "COS" not in stop and "Purchase" not in stop
+    ]
+    ssw_tap_names = utils.ProcessList(sswtaps)
+    station_counts = Counter(name for name in ssw_tap_names if name.endswith("Stn"))
+
+    parsed_records = []
+    for row in rows[1:]:
+        if len(row) < 2:
+            continue
+
+        timestamp_text = str(row[0]).strip()
+        action_text = str(row[1]).strip()
+
+        if not action_text:
+            break
+
+        if not timestamp_text:
+            continue
+
+        try:
+            parsed_dt = datetime.strptime(timestamp_text, TIMESTAMP_FORMAT)
+        except ValueError:
+            continue
+
+        journey_id = ""
+        if len(row) > 6 and str(row[6]).strip().lower() != "nan":
+            journey_id = str(row[6]).strip()
+
+        parsed_records.append({
+            "timestamp_text": timestamp_text,
+            "dt": parsed_dt,
+            "action": action_text,
+            "journey_id": journey_id,
+        })
+
+    hourly_trip_timestamps = build_hourly_trip_timestamps(parsed_records)
+
+    hour_counts = [0] * 24
+    weekday_counts = [0] * 7
+    month_counts = [0] * 12
+
+    for ts in hourly_trip_timestamps:
+        try:
+            dt = datetime.strptime(str(ts).strip(), TIMESTAMP_FORMAT)
+        except ValueError:
+            continue
+
+        hour_counts[dt.hour] += 1
+        weekday_counts[dt.weekday()] += 1
+        month_counts[dt.month - 1] += 1
+
+    return {
+        "station_counts": dict(station_counts),
+        "hour_counts": hour_counts,
+        "weekday_counts": weekday_counts,
+        "month_counts": month_counts,
+    }
+
+
+def build_compare_taps_from_rows(rows):
+    events = []
+    skip_refund_tap_in = False
+    data_rows = rows[1:]
+
+    def classify_tap_mode(action_text, tap_name):
+        lowered_action = action_text.lower()
+        lowered_name = tap_name.lower()
+
+        if "bus stop" in lowered_action or "bus stop" in lowered_name:
+            return "bus"
+        if lowered_name.endswith("quay"):
+            return "seabus"
+        if "wce" in lowered_action or "wce" in lowered_name:
+            return "wce"
+        if lowered_name.endswith("station"):
+            return "wce"
+        if lowered_name.endswith("stn"):
+            return "skytrain"
+        return "other"
+
+    def classify_tap_kind(action_text):
+        lowered = str(action_text).lower()
+        if lowered.startswith("tap in at"):
+            return "tap_in"
+        if lowered.startswith("tap out at"):
+            return "tap_out"
+        if lowered.startswith("transfer at"):
+            return "transfer"
+        if lowered.startswith("missing tap in"):
+            return "missing_in"
+        if lowered.startswith("missing tap out"):
+            return "missing_out"
+        return "other"
+
+    def infer_missing_tap_name(index, missing_kind):
+        search_offsets = [1, -1, 2, -2]
+        if missing_kind == "missing_out":
+            search_offsets = [-1, 1, -2, 2]
+
+        for offset in search_offsets:
+            j = index + offset
+            if j < 0 or j >= len(data_rows):
+                continue
+
+            candidate = data_rows[j]
+            if len(candidate) < 2:
+                continue
+            candidate_action = str(candidate[1]).strip()
+            candidate_lowered = candidate_action.lower()
+            if not candidate_action or candidate_lowered.startswith("missing tap"):
+                continue
+            if " at " not in candidate_action:
+                continue
+
+            candidate_tap_name = candidate_action.split(" at ", 1)[1].strip()
+            if "bus stop" in candidate_tap_name.lower():
+                continue
+
+            return candidate_tap_name
+
+        return ""
+
+    for index, row in enumerate(data_rows):
+        if len(row) < 2:
+            continue
+
+        timestamp_text = str(row[0]).strip()
+        action_text = str(row[1]).strip()
+
+        if not action_text:
+            break
+
+        lowered = action_text.lower()
+
+        if "refund" in lowered:
+            # Refund rows are ignored, and the next Tap in for that refunded trip is ignored too.
+            skip_refund_tap_in = True
+            continue
+
+        if skip_refund_tap_in:
+            if action_text.startswith("Tap in at"):
+                skip_refund_tap_in = False
+                continue
+            skip_refund_tap_in = False
+
+        is_tap_like = (
+            lowered.startswith("tap in at")
+            or lowered.startswith("tap out at")
+            or lowered.startswith("transfer at")
+            or lowered.startswith("missing tap in")
+            or lowered.startswith("missing tap out")
+        )
+        if not is_tap_like:
+            continue
+
+        tap_kind = classify_tap_kind(action_text)
+
+        try:
+            dt = datetime.strptime(timestamp_text, TIMESTAMP_FORMAT)
+        except ValueError:
+            continue
+
+        inferred_name = ""
+        if tap_kind in {"missing_in", "missing_out"}:
+            inferred_name = infer_missing_tap_name(index, tap_kind)
+            tap_name = "(Missing)"
+        elif " at " in action_text:
+            tap_name = action_text.split(" at ", 1)[1].strip()
+        else:
+            tap_name = action_text.strip()
+
+        tap_key_source = inferred_name if inferred_name else tap_name
+        tap_key = re.sub(r"\s+", " ", tap_key_source).strip().lower()
+        if not tap_key:
+            continue
+
+        is_missing = tap_kind in {"missing_in", "missing_out"}
+        mode_name = inferred_name if inferred_name else tap_name
+        mode = classify_tap_mode(action_text, mode_name)
+
+        events.append({
+            "timestamp": dt.isoformat(),
+            "row_index": index,
+            "tap_name": tap_name,
+            "tap_key": tap_key,
+            "mode": mode,
+            "is_missing": is_missing,
+            "tap_kind": tap_kind,
+            "action_text": action_text,
+        })
+
+    return events
+
+
+def build_compare_complete_trips_from_rows(rows):
+    complete_trips = []
+    data = rows[1:]
+
+    def classify_tap_mode(action_text, tap_name):
+        lowered_action = action_text.lower()
+        lowered_name = tap_name.lower()
+
+        if "bus stop" in lowered_action or "bus stop" in lowered_name:
+            return "bus"
+        if lowered_name.endswith("quay"):
+            return "seabus"
+        if "wce" in lowered_action or "wce" in lowered_name:
+            return "wce"
+        if lowered_name.endswith("station"):
+            return "wce"
+        if lowered_name.endswith("stn"):
+            return "skytrain"
+        return "other"
+
+    for i in range(len(data) - 1):
+        row = data[i]
+        next_row = data[i + 1]
+        if len(row) < 2 or len(next_row) < 1:
+            continue
+
+        timestamp_text = str(row[0]).strip()
+        action_text = str(row[1]).strip()
+        next_timestamp_text = str(next_row[0]).strip()
+
+        if not action_text:
+            break
+
+        lowered = action_text.lower()
+        if "refund" in lowered or "missing" in lowered:
+            continue
+        if "out" not in lowered:
+            continue
+
+        try:
+            ts_out = datetime.strptime(timestamp_text, TIMESTAMP_FORMAT)
+            ts_in = datetime.strptime(next_timestamp_text, TIMESTAMP_FORMAT)
+        except ValueError:
+            continue
+
+        duration_min = (ts_out - ts_in).total_seconds() / 60
+        if duration_min <= 0:
+            continue
+
+        if " at " in action_text:
+            tap_name = action_text.split(" at ", 1)[1].strip()
+        else:
+            tap_name = action_text.strip()
+
+        tap_key = re.sub(r"\s+", " ", tap_name).strip().lower()
+        if not tap_key:
+            continue
+
+        mode = classify_tap_mode(action_text, tap_name)
+        if mode not in {"skytrain", "seabus", "wce"}:
+            continue
+
+        complete_trips.append({
+            "id": i,
+            "timestamp": ts_out.isoformat(),
+            "tap_key": tap_key,
+            "mode": mode,
+            "duration_min": round(duration_min, 2),
+        })
+
+    return complete_trips
+
+
+def build_shared_trip_matches(file_a_events, file_b_events):
+    def tap_phase(event):
+        tap_kind = str(event.get("tap_kind", ""))
+        if tap_kind in {"tap_in", "transfer", "missing_in"}:
+            return "in"
+        if tap_kind in {"tap_out", "missing_out"}:
+            return "out"
+        return "other"
+
+    grouped_a = {}
+    grouped_b = {}
+
+    for event in file_a_events:
+        tap_key = str(event.get("tap_key", "")).strip()
+        if not tap_key:
+            continue
+        key = f"{tap_key}::{tap_phase(event)}"
+        grouped_a.setdefault(key, []).append(event)
+
+    for event in file_b_events:
+        tap_key = str(event.get("tap_key", "")).strip()
+        if not tap_key:
+            continue
+        key = f"{tap_key}::{tap_phase(event)}"
+        grouped_b.setdefault(key, []).append(event)
+
+    matches = []
+    for combined_key, events_a in grouped_a.items():
+        events_b = grouped_b.get(combined_key, [])
+        if not events_b:
+            continue
+
+        sorted_a = sorted(
+            events_a,
+            key=lambda e: (str(e.get("timestamp", "")), int(e.get("row_index", 0))),
+        )
+        sorted_b = sorted(
+            events_b,
+            key=lambda e: (str(e.get("timestamp", "")), int(e.get("row_index", 0))),
+        )
+
+        i = 0
+        j = 0
+        while i < len(sorted_a) and j < len(sorted_b):
+            event_a = sorted_a[i]
+            event_b = sorted_b[j]
+
+            try:
+                ts_a = datetime.fromisoformat(str(event_a.get("timestamp", "")))
+                ts_b = datetime.fromisoformat(str(event_b.get("timestamp", "")))
+            except ValueError:
+                i += 1
+                j += 1
+                continue
+
+            diff_seconds = abs((ts_a - ts_b).total_seconds())
+            mode_a = str(event_a.get("mode", "other"))
+            mode_b = str(event_b.get("mode", "other"))
+
+            if diff_seconds <= 120:
+                mode = mode_a if mode_a != "other" else mode_b
+
+                tap_key = combined_key.split("::", 1)[0]
+                export_timestamp = event_b.get("timestamp") if event_a.get("is_missing") else event_a.get("timestamp")
+                export_action = event_b.get("action_text") if event_a.get("is_missing") else event_a.get("action_text")
+
+                matches.append({
+                    "tap_name": event_a.get("tap_name", ""),
+                    "tap_name_a": event_a.get("tap_name", ""),
+                    "tap_name_b": event_b.get("tap_name", ""),
+                    "tap_key": tap_key,
+                    "mode": mode,
+                    "a_missing": bool(event_a.get("is_missing")),
+                    "b_missing": bool(event_b.get("is_missing")),
+                    "tap_a": event_a.get("tap_kind", ""),
+                    "tap_b": event_b.get("tap_kind", ""),
+                    "ts_a": str(event_a.get("timestamp", "")),
+                    "ts_b": str(event_b.get("timestamp", "")),
+                    "row_index_a": int(event_a.get("row_index", 0)),
+                    "row_index_b": int(event_b.get("row_index", 0)),
+                    "diff_min": f"{(diff_seconds / 60):.2f}",
+                    "export_timestamp": str(export_timestamp or ""),
+                    "export_action": str(export_action or ""),
+                    "export_timestamp_a": str(event_a.get("timestamp", "") or ""),
+                    "export_action_a": str(event_a.get("action_text", "") or ""),
+                    "export_timestamp_b": str(event_b.get("timestamp", "") or ""),
+                    "export_action_b": str(event_b.get("action_text", "") or ""),
+                })
+                i += 1
+                j += 1
+            elif ts_a < ts_b:
+                i += 1
+            else:
+                j += 1
+
+    matches.sort(
+        key=lambda m: (
+            -datetime.fromisoformat(str(m.get("ts_a", datetime.min.isoformat()))).timestamp(),
+            int(m.get("row_index_a", 0)),
+        )
+    )
+
+    return matches
+
+
+def is_exact_shared_match(match):
+    tap_a = str(match.get("tap_a", ""))
+    tap_b = str(match.get("tap_b", ""))
+
+    if tap_a in {"tap_in", "transfer"}:
+        tap_a = "tap_in"
+    if tap_b in {"tap_in", "transfer"}:
+        tap_b = "tap_in"
+
+    return (
+        not bool(match.get("a_missing"))
+        and not bool(match.get("b_missing"))
+        and tap_a == tap_b
+    )
+
+
+def _is_tap_out_kind(tap_kind):
+    return str(tap_kind) in {"tap_out", "missing_out"}
+
+
+def _is_tap_in_kind(tap_kind):
+    return str(tap_kind) in {"tap_in", "transfer", "missing_in"}
+
+
+def build_partner_row_map(events):
+    sorted_events = sorted(events, key=lambda e: int(e.get("row_index", 0)))
+    partners = {}
+
+    for i, event in enumerate(sorted_events):
+        row_index = int(event.get("row_index", -1))
+        tap_kind = str(event.get("tap_kind", ""))
+
+        if _is_tap_out_kind(tap_kind):
+            partner_index = None
+            for j in range(i + 1, len(sorted_events)):
+                if _is_tap_in_kind(sorted_events[j].get("tap_kind", "")):
+                    partner_index = int(sorted_events[j].get("row_index", -1))
+                    break
+            partners[row_index] = partner_index
+            continue
+
+        if _is_tap_in_kind(tap_kind):
+            partner_index = None
+            for j in range(i - 1, -1, -1):
+                if _is_tap_out_kind(sorted_events[j].get("tap_kind", "")):
+                    partner_index = int(sorted_events[j].get("row_index", -1))
+                    break
+            partners[row_index] = partner_index
+            continue
+
+        partners[row_index] = None
+
+    return partners
+
+
+def annotate_match_trip_status(matches, file_a_events, file_b_events):
+    partner_a = build_partner_row_map(file_a_events)
+    partner_b = build_partner_row_map(file_b_events)
+    match_lookup = {
+        (int(match.get("row_index_a", -1)), int(match.get("row_index_b", -1))): match
+        for match in matches
+    }
+
+    for match in matches:
+        if not is_exact_shared_match(match):
+            match["match_status"] = "mismatch"
+            match["is_exact_trip"] = False
+            continue
+
+        if str(match.get("mode", "")) == "bus":
+            # Bus taps are single-ended for fare data, so exact tap matches are treated as complete.
+            match["match_status"] = "exact_trip"
+            match["is_exact_trip"] = True
+            continue
+
+        row_a = int(match.get("row_index_a", -1))
+        row_b = int(match.get("row_index_b", -1))
+        partner_row_a = partner_a.get(row_a)
+        partner_row_b = partner_b.get(row_b)
+
+        if partner_row_a is None or partner_row_b is None:
+            match["match_status"] = "one_end"
+            match["is_exact_trip"] = False
+            continue
+
+        partner_match = match_lookup.get((partner_row_a, partner_row_b))
+        is_exact_trip = bool(partner_match and is_exact_shared_match(partner_match))
+        match["match_status"] = "exact_trip" if is_exact_trip else "one_end"
+        match["is_exact_trip"] = is_exact_trip
+
+    return matches
+
+
+def build_rows_from_shared_matches(matches, side="a"):
+    rows = [["DateTime", "Transaction"]]
+
+    for match in matches:
+        if side == "b":
+            export_timestamp = str(match.get("export_timestamp_b", "")).strip()
+            export_action = str(match.get("export_action_b", "")).strip()
+        else:
+            export_timestamp = str(match.get("export_timestamp_a", "")).strip()
+            export_action = str(match.get("export_action_a", "")).strip()
+
+        if export_timestamp:
+            try:
+                formatted_timestamp = datetime.fromisoformat(export_timestamp).strftime(TIMESTAMP_FORMAT)
+            except ValueError:
+                formatted_timestamp = export_timestamp
+        else:
+            formatted_timestamp = ""
+
+        rows.append([formatted_timestamp, export_action])
+
+    return rows
+
+
 def normalize_station_key(action_text):
     if not action_text:
         return ""
@@ -384,8 +1037,8 @@ def more_upload_multiple():
     files = request.files.getlist("files")
     valid_files = [uploaded for uploaded in files if uploaded and uploaded.filename]
 
-    if not valid_files:
-        flash("Please choose one or more CSV files to upload.")
+    if len(valid_files) < 2:
+        flash("Please add at least two CSV files.")
         return redirect(url_for("more"))
 
     for uploaded in valid_files:
@@ -395,12 +1048,184 @@ def more_upload_multiple():
             return redirect(url_for("more"))
 
     selected_names = [secure_filename(uploaded.filename) for uploaded in valid_files]
-    upload_detail = f"Selected {len(selected_names)} CSV file(s): {', '.join(selected_names)}"
+    total_trips = 0
+    total_ssw_trips = 0
+    total_skytrain_trips = 0
+    total_seabus_trips = 0
+    total_wce_trips = 0
+    total_minutes = 0.0
+    usage_by_file = []
+    compare_tap_data = []
+
+    chart_colors = [
+        "#3b82f6",
+        "#22c55e",
+        "#ef4444",
+        "#f59e0b",
+        "#8b5cf6",
+        "#14b8a6",
+        "#ec4899",
+        "#84cc16",
+    ]
+
+    for uploaded in valid_files:
+        try:
+            rows = parse_uploaded_csv_rows(uploaded)
+        except UnicodeDecodeError:
+            flash("CSV must be UTF-8 encoded.")
+            return redirect(url_for("more"))
+        except csv.Error:
+            flash("CSV parsing failed due to malformed CSV structure.")
+            return redirect(url_for("more"))
+
+        summary_metrics = calculate_summary_metrics_from_rows(rows)
+        total_trips += summary_metrics["trips"]
+        total_ssw_trips += summary_metrics["ssw_trips"]
+        total_skytrain_trips += summary_metrics["skytrain_trips"]
+        total_seabus_trips += summary_metrics["seabus_trips"]
+        total_wce_trips += summary_metrics["wce_trips"]
+        total_minutes += calculate_minutes_from_rows(rows)
+
+        usage_breakdown = build_usage_breakdowns_from_rows(rows)
+        compare_taps = build_compare_taps_from_rows(rows)
+        compare_complete_trips = build_compare_complete_trips_from_rows(rows)
+        usage_by_file.append({
+            "label": secure_filename(uploaded.filename),
+            "color": chart_colors[(len(usage_by_file)) % len(chart_colors)],
+            "trips": summary_metrics["trips"],
+            "ssw_trips": summary_metrics["ssw_trips"],
+            "skytrain_trips": summary_metrics["skytrain_trips"],
+            "seabus_trips": summary_metrics["seabus_trips"],
+            "wce_trips": summary_metrics["wce_trips"],
+            "station_counts": usage_breakdown["station_counts"],
+            "hour_counts": usage_breakdown["hour_counts"],
+            "weekday_counts": usage_breakdown["weekday_counts"],
+            "month_counts": usage_breakdown["month_counts"],
+        })
+        compare_tap_data.append({
+            "label": secure_filename(uploaded.filename),
+            "events": compare_taps,
+            "complete_trips": compare_complete_trips,
+        })
+
+    days, hours, mins = format_duration_days_hours_minutes(total_minutes)
+    percent_ssw = (total_ssw_trips / total_trips) * 100 if total_trips else 0
+
+    station_total_counts = Counter()
+    for file_usage in usage_by_file:
+        station_total_counts.update(file_usage["station_counts"])
+
+    station_labels = [
+        station for station, _count in sorted(
+            station_total_counts.items(),
+            key=lambda item: (-item[1], item[0])
+        )
+    ]
+
+    hour_labels = [
+        f"{(hour % 12) or 12} {'AM' if hour < 12 else 'PM'}"
+        for hour in range(24)
+    ]
+    weekday_labels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    month_labels = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
+
+    station_datasets = []
+    hour_datasets = []
+    weekday_datasets = []
+    month_datasets = []
+
+    pie_labels = [file_usage["label"] for file_usage in usage_by_file]
+    pie_colors = [file_usage["color"] for file_usage in usage_by_file]
+    pie_total_trips = [file_usage["trips"] for file_usage in usage_by_file]
+    pie_bus_only = [max(0, file_usage["trips"] - file_usage["ssw_trips"]) for file_usage in usage_by_file]
+    pie_skytrain = [file_usage["skytrain_trips"] for file_usage in usage_by_file]
+    pie_seabus = [file_usage["seabus_trips"] for file_usage in usage_by_file]
+    pie_wce = [file_usage["wce_trips"] for file_usage in usage_by_file]
+    shared_pair_metrics = {}
+
+    for i in range(len(compare_tap_data)):
+        for j in range(i + 1, len(compare_tap_data)):
+            matches = build_shared_trip_matches(
+                compare_tap_data[i].get("events", []),
+                compare_tap_data[j].get("events", []),
+            )
+            matches = annotate_match_trip_status(
+                matches,
+                compare_tap_data[i].get("events", []),
+                compare_tap_data[j].get("events", []),
+            )
+            exact_matches = [match for match in matches if bool(match.get("is_exact_trip"))]
+            match_rows = build_rows_from_shared_matches(exact_matches, side="a")
+            metrics = calculate_summary_metrics_from_rows(match_rows)
+            minutes = int(round(calculate_minutes_from_rows(match_rows)))
+            pair_key = f"{i}-{j}"
+            shared_pair_metrics[pair_key] = {
+                "trips": int(metrics["trips"]),
+                "ssw_trips": int(metrics["ssw_trips"]),
+                "skytrain_trips": int(metrics["skytrain_trips"]),
+                "seabus_trips": int(metrics["seabus_trips"]),
+                "wce_trips": int(metrics["wce_trips"]),
+                "percent_ssw": round((metrics["ssw_trips"] / metrics["trips"] * 100) if metrics["trips"] else 0, 1),
+                "minutes": minutes,
+            }
+
+    for file_usage in usage_by_file:
+        station_datasets.append({
+            "label": file_usage["label"],
+            "backgroundColor": file_usage["color"],
+            "data": [file_usage["station_counts"].get(label, 0) for label in station_labels],
+        })
+        hour_datasets.append({
+            "label": file_usage["label"],
+            "backgroundColor": file_usage["color"],
+            "data": file_usage["hour_counts"],
+        })
+        weekday_datasets.append({
+            "label": file_usage["label"],
+            "backgroundColor": file_usage["color"],
+            "data": file_usage["weekday_counts"],
+        })
+        month_datasets.append({
+            "label": file_usage["label"],
+            "backgroundColor": file_usage["color"],
+            "data": file_usage["month_counts"],
+        })
+
+    station_chart_height = max(420, len(station_labels) * 30)
 
     return render_template(
-        "more_todo.html",
-        message="todo soon, for comparing trips between several csv's",
-        upload_detail=upload_detail,
+        "more_multi_results.html",
+        total_trips=total_trips,
+        total_ssw_trips=total_ssw_trips,
+        percent_ssw=percent_ssw,
+        total_skytrain_trips=total_skytrain_trips,
+        total_seabus_trips=total_seabus_trips,
+        total_wce_trips=total_wce_trips,
+        total_days=days,
+        total_hours=hours,
+        total_mins=mins,
+        selected_count=len(selected_names),
+        station_labels=station_labels,
+        hour_labels=hour_labels,
+        weekday_labels=weekday_labels,
+        month_labels=month_labels,
+        station_datasets=station_datasets,
+        hour_datasets=hour_datasets,
+        weekday_datasets=weekday_datasets,
+        month_datasets=month_datasets,
+        station_chart_height=station_chart_height,
+        pie_labels=pie_labels,
+        pie_colors=pie_colors,
+        pie_total_trips=pie_total_trips,
+        pie_bus_only=pie_bus_only,
+        pie_skytrain=pie_skytrain,
+        pie_seabus=pie_seabus,
+        pie_wce=pie_wce,
+        compare_tap_data=compare_tap_data,
+        shared_pair_metrics=shared_pair_metrics,
     )
 
 

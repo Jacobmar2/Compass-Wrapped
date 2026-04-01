@@ -8,6 +8,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const isSideView = () => window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
   const isSwipeMode = () => isPhoneMode() || isSideView();
 
+  // If another page requested a targeted scroll, perform it now and clear the flag.
+  try {
+    const requested = sessionStorage.getItem('scrollToSection');
+    if (requested) {
+      sessionStorage.removeItem('scrollToSection');
+      const targetEl = document.getElementById(requested);
+      if (targetEl) {
+        // Close sidebar overlay if open to avoid landing under it
+        const sidebar = document.getElementById('resultsSidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) sidebar.classList.add('collapsed');
+        if (overlay) {
+          overlay.classList.remove('open');
+          overlay.setAttribute('aria-hidden', 'true');
+        }
+        // Smooth-scroll to the element after a tiny delay to let layout settle
+        setTimeout(() => {
+          try {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // give other scroll handlers a moment to update active state
+            setTimeout(() => window.dispatchEvent(new Event('scroll')), 250);
+          } catch (err) {
+            // ignore
+          }
+        }, 60);
+      }
+    }
+  } catch (err) {
+    // sessionStorage may be unavailable in some contexts
+  }
+
   function formatHourLabel(hourValue, compact = true) {
     const numericHour = Number(hourValue);
     if (Number.isNaN(numericHour)) return String(hourValue);
@@ -771,13 +802,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (point.markerType === 'station') {
           popupTitle = `Station #${point.rank}: ${point.name}`;
-          popupMeta = `Uses: ${point.count}${point.source_name ? `<br>Location source: ${point.source_name}` : ''}`;
+          popupMeta = `Uses: ${point.count}<br>Last used: ${point.last_used_display || 'Unknown'}${point.source_name ? `<br>Location source: ${point.source_name}` : ''}`;
         } else if (point.markerType === 'bus') {
           popupTitle = `Bus Stop #${point.rank}: ${point.name}`;
-          popupMeta = `Stop #${point.stop_id}<br>Uses: ${point.count}`;
+          popupMeta = `Stop #${point.stop_id}<br>Uses: ${point.count}<br>Last used: ${point.last_used_display || 'Unknown'}`;
         } else {
           popupTitle = `${point.markerType === 'seabus' ? 'SeaBus' : 'WCE'}: ${point.name}`;
-          popupMeta = `Uses: ${point.uses}`;
+          popupMeta = `Uses: ${point.uses}<br>Last used: ${point.last_used_display || 'Unknown'}`;
         }
 
         const originalLatLng = L.latLng(point.lat, point.lon);
@@ -802,7 +833,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
           .addTo(map)
           .bindPopup(
-            `<div class="map-popup-title">${point.markerType === 'seabus' ? 'SeaBus' : 'WCE'}: ${point.name}</div><div class="map-popup-meta">Uses: ${point.uses}</div>`
+            `<div class="map-popup-title">${point.markerType === 'seabus' ? 'SeaBus' : 'WCE'}: ${point.name}</div><div class="map-popup-meta">Uses: ${point.uses}<br>Last used: ${point.last_used_display || 'Unknown'}</div>`
           );
 
         specialTransitMarkers.push({ marker, point });

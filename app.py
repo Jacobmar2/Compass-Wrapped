@@ -23,6 +23,34 @@ TIMESTAMP_FORMAT = "%b-%d-%Y %I:%M %p"
 WCE_TERMINAL_STATION_KEYS = {"waterfront", "moody center"}
 
 
+def format_last_used_for_display(last_used_dt):
+    if not last_used_dt:
+        return {
+            "timestamp": "Unknown",
+            "days_ago": None,
+            "relative": "unknown",
+            "display": "Unknown",
+        }
+
+    timestamp_text = last_used_dt.strftime(TIMESTAMP_FORMAT)
+    day_delta = (datetime.now().date() - last_used_dt.date()).days
+
+    if day_delta <= 0:
+        relative_text = "today"
+        day_delta = 0
+    elif day_delta == 1:
+        relative_text = "1 day ago"
+    else:
+        relative_text = f"{day_delta} days ago"
+
+    return {
+        "timestamp": timestamp_text,
+        "days_ago": day_delta,
+        "relative": relative_text,
+        "display": f"{timestamp_text} ({relative_text})",
+    }
+
+
 def parse_uploaded_csv_rows(uploaded_file):
     uploaded_file.stream.seek(0)
     text_stream = uploaded_file.stream.read().decode("utf-8").splitlines()
@@ -1056,6 +1084,7 @@ def more_upload_multiple():
     total_minutes = 0.0
     usage_by_file = []
     compare_tap_data = []
+    map_file_station_names = []
 
     chart_colors = [
         "#3b82f6",
@@ -1089,6 +1118,15 @@ def more_upload_multiple():
         usage_breakdown = build_usage_breakdowns_from_rows(rows)
         compare_taps = build_compare_taps_from_rows(rows)
         compare_complete_trips = build_compare_complete_trips_from_rows(rows)
+
+        visited_station_names = set()
+        for station_name, count in usage_breakdown["station_counts"].items():
+            if not count:
+                continue
+            location = utils.get_station_location(station_name)
+            if location:
+                visited_station_names.add(location["name"])
+
         usage_by_file.append({
             "label": secure_filename(uploaded.filename),
             "color": chart_colors[(len(usage_by_file)) % len(chart_colors)],
@@ -1102,6 +1140,7 @@ def more_upload_multiple():
             "weekday_counts": usage_breakdown["weekday_counts"],
             "month_counts": usage_breakdown["month_counts"],
         })
+        map_file_station_names.append(sorted(visited_station_names))
         compare_tap_data.append({
             "label": secure_filename(uploaded.filename),
             "events": compare_taps,
@@ -1145,6 +1184,7 @@ def more_upload_multiple():
     pie_seabus = [file_usage["seabus_trips"] for file_usage in usage_by_file]
     pie_wce = [file_usage["wce_trips"] for file_usage in usage_by_file]
     shared_pair_metrics = {}
+    shared_pair_station_names = {}
 
     for i in range(len(compare_tap_data)):
         for j in range(i + 1, len(compare_tap_data)):
@@ -1172,6 +1212,18 @@ def more_upload_multiple():
                 "minutes": minutes,
             }
 
+            shared_trip_stations = set()
+            for match in exact_matches:
+                if match.get("tap_name_a"):
+                    location = utils.get_station_location(match["tap_name_a"])
+                    if location:
+                        shared_trip_stations.add(location["name"])
+                if match.get("tap_name_b"):
+                    location = utils.get_station_location(match["tap_name_b"])
+                    if location:
+                        shared_trip_stations.add(location["name"])
+            shared_pair_station_names[pair_key] = sorted(shared_trip_stations)
+
     for file_usage in usage_by_file:
         station_datasets.append({
             "label": file_usage["label"],
@@ -1195,6 +1247,23 @@ def more_upload_multiple():
         })
 
     station_chart_height = max(420, len(station_labels) * 30)
+
+    map_station_points = []
+    seen_map_station_names = set()
+    for station_name in utils.SkyTrainStns:
+        location = utils.get_station_location(station_name)
+        if not location:
+            continue
+        source_name = location["name"]
+        if source_name in seen_map_station_names:
+            continue
+        seen_map_station_names.add(source_name)
+        map_station_points.append({
+            "name": station_name,
+            "source_name": source_name,
+            "lat": location["lat"],
+            "lon": location["lon"],
+        })
 
     return render_template(
         "more_multi_results.html",
@@ -1226,6 +1295,9 @@ def more_upload_multiple():
         pie_wce=pie_wce,
         compare_tap_data=compare_tap_data,
         shared_pair_metrics=shared_pair_metrics,
+        map_station_points=map_station_points,
+        map_file_station_names=map_file_station_names,
+        shared_pair_station_names=shared_pair_station_names,
     )
 
 
@@ -1287,14 +1359,29 @@ def upload_file():
             # 🔽 This is where you add your custom logic
             # --------------------------------------------------
             # Example: Read CSV and process it
-            trips = []
+            trip_rows = []
             with open(fileName, newline="", encoding="utf-8") as csvfile:
                 reader = csv.reader(csvfile)
                 next(reader)  # skip header row
                 for row in reader:
                     if len(row) < 2 or row[1].strip() == "":
                         break  # stop at first empty cell
-                    trips.append(row[1])
+                    timestamp_text = str(row[0]).strip()
+                    action_text = str(row[1]).strip()
+
+                    parsed_dt = None
+                    if timestamp_text:
+                        try:
+                            parsed_dt = datetime.strptime(timestamp_text, TIMESTAMP_FORMAT)
+                        except ValueError:
+                            parsed_dt = None
+
+                    trip_rows.append({
+                        "timestamp": parsed_dt,
+                        "action": action_text,
+                    })
+
+            trips = [entry["action"] for entry in trip_rows]
 
                         # All SkyTrain/Seabus/WCE taps
             trips = utils.remove_refund_pairs(trips)
@@ -1316,11 +1403,60 @@ def upload_file():
 
             SSWTapsNames = utils.ProcessList(SSWTaps)
 
+            stationLastUsedByName = {}
+            swceLastUsedByName = {}
+            busStopLastUsedById = {}
+            cleaned_trip_rows = []
+            skip_refund_tap_in = False
+
+            for entry in trip_rows:
+                action = entry["action"]
+                lowered = action.lower()
+
+                if "refund" in lowered:
+                    skip_refund_tap_in = True
+                    continue
+
+                if skip_refund_tap_in:
+                    if lowered.startswith("tap in at"):
+                        skip_refund_tap_in = False
+                        continue
+                    skip_refund_tap_in = False
+
+                cleaned_trip_rows.append(entry)
+
+                processed_name = action
+                if "Missing" in action:
+                    processed_name = "(Missing)"
+                elif "at" in action:
+                    processed_name = action.split("at", 1)[1].strip()
+
+                entry_dt = entry["timestamp"]
+                if not entry_dt:
+                    continue
+
+                if processed_name.endswith("Stn"):
+                    previous_station_dt = stationLastUsedByName.get(processed_name)
+                    if not previous_station_dt or entry_dt > previous_station_dt:
+                        stationLastUsedByName[processed_name] = entry_dt
+
+                if processed_name.endswith("Quay") or processed_name.endswith("Stn - WCE") or processed_name.endswith("Station"):
+                    previous_swce_dt = swceLastUsedByName.get(processed_name)
+                    if not previous_swce_dt or entry_dt > previous_swce_dt:
+                        swceLastUsedByName[processed_name] = entry_dt
+
+                if "Bus Stop" in action:
+                    match = re.search(r"\d{5}", action)
+                    if match:
+                        stop_id = match.group()
+                        previous_bus_dt = busStopLastUsedById.get(stop_id)
+                        if not previous_bus_dt or entry_dt > previous_bus_dt:
+                            busStopLastUsedById[stop_id] = entry_dt
+
             # Extract and count bus stops
             BusStops = [stop for stop in trips if "Bus Stop" in stop]
             BusStopNumbers = []
-            
-            import re
+
             for stop in BusStops:
                 # Extract 5-digit number from bus stop entry (e.g., "Bus Stop 50123")
                 match = re.search(r'\d{5}', stop)
@@ -1329,6 +1465,14 @@ def upload_file():
             
             # Count bus stops by their 5-digit number
             BusStopCounts = utils.CountElementsInList(BusStopNumbers)
+            BusStopCounts = sorted(
+                BusStopCounts,
+                key=lambda item: (
+                    -item[1],
+                    -(busStopLastUsedById.get(item[0], datetime(1970, 1, 1))).timestamp(),
+                    item[0],
+                )
+            )
             
             # Get top 10 bus stops and map them to their names
             Top10BusStops = BusStopCounts[:10]
@@ -1349,6 +1493,7 @@ def upload_file():
                 location = utils.get_bus_stop_location(stop_id)
                 if not location:
                     continue
+                last_used_meta = format_last_used_for_display(busStopLastUsedById.get(stop_id))
                 topBusStopMapPoints.append({
                     "rank": rank,
                     "name": stop_name,
@@ -1356,6 +1501,10 @@ def upload_file():
                     "count": count,
                     "lat": location["lat"],
                     "lon": location["lon"],
+                    "last_used_timestamp": last_used_meta["timestamp"],
+                    "last_used_days_ago": last_used_meta["days_ago"],
+                    "last_used_relative": last_used_meta["relative"],
+                    "last_used_display": last_used_meta["display"],
                 })
 
             remainingBusStopMapPoints = []
@@ -1363,6 +1512,7 @@ def upload_file():
                 location = utils.get_bus_stop_location(stop_id)
                 if not location:
                     continue
+                last_used_meta = format_last_used_for_display(busStopLastUsedById.get(stop_id))
                 remainingBusStopMapPoints.append({
                     "rank": rank,
                     "name": stop_name,
@@ -1370,6 +1520,10 @@ def upload_file():
                     "count": count,
                     "lat": location["lat"],
                     "lon": location["lon"],
+                    "last_used_timestamp": last_used_meta["timestamp"],
+                    "last_used_days_ago": last_used_meta["days_ago"],
+                    "last_used_relative": last_used_meta["relative"],
+                    "last_used_display": last_used_meta["display"],
                 })
 
             #utils.printOutList(SSWTapsNames) #print out every SSW tap name
@@ -1697,21 +1851,25 @@ def upload_file():
 
             #Getting top 5 used SkyTrain Stns
 
-            Top5SkyTrainStns = sorted(
+            sortedSkyTrainStns = sorted(
                 SkyTrainStns,
-                key=lambda x: (-x[1], x[0])
-            )[:5]
+                key=lambda item: (
+                    -item[1],
+                    -(stationLastUsedByName.get(item[0], datetime(1970, 1, 1))).timestamp(),
+                    item[0],
+                )
+            )
 
-            RemainingSkyTrainStns = sorted(
-                SkyTrainStns,
-                key=lambda x: (-x[1], x[0])
-            )[5:]
+            Top5SkyTrainStns = sortedSkyTrainStns[:5]
+
+            RemainingSkyTrainStns = sortedSkyTrainStns[5:]
 
             topStationMapPoints = []
             for rank, (name, count) in enumerate(Top5SkyTrainStns, start=1):
                 location = utils.get_station_location(name)
                 if not location:
                     continue
+                last_used_meta = format_last_used_for_display(stationLastUsedByName.get(name))
                 topStationMapPoints.append({
                     "rank": rank,
                     "name": name,
@@ -1719,6 +1877,10 @@ def upload_file():
                     "lat": location["lat"],
                     "lon": location["lon"],
                     "source_name": location["name"],
+                    "last_used_timestamp": last_used_meta["timestamp"],
+                    "last_used_days_ago": last_used_meta["days_ago"],
+                    "last_used_relative": last_used_meta["relative"],
+                    "last_used_display": last_used_meta["display"],
                 })
 
             remainingStationMapPoints = []
@@ -1726,6 +1888,7 @@ def upload_file():
                 location = utils.get_station_location(name)
                 if not location:
                     continue
+                last_used_meta = format_last_used_for_display(stationLastUsedByName.get(name))
                 remainingStationMapPoints.append({
                     "rank": rank,
                     "name": name,
@@ -1733,6 +1896,10 @@ def upload_file():
                     "lat": location["lat"],
                     "lon": location["lon"],
                     "source_name": location["name"],
+                    "last_used_timestamp": last_used_meta["timestamp"],
+                    "last_used_days_ago": last_used_meta["days_ago"],
+                    "last_used_relative": last_used_meta["relative"],
+                    "last_used_display": last_used_meta["display"],
                 })
 
             #counting minutes spent on SSW
@@ -1840,6 +2007,14 @@ def upload_file():
                         return SWCEUsageDict[alias.lower()]
                 return 0
 
+            def get_swce_last_used(*aliases):
+                best_dt = None
+                for alias in aliases:
+                    candidate_dt = swceLastUsedByName.get(alias)
+                    if candidate_dt and (not best_dt or candidate_dt > best_dt):
+                        best_dt = candidate_dt
+                return format_last_used_for_display(best_dt)
+
             wceLonsdaleStations = [
                 {
                     "name": "Lonsdale Quay",
@@ -1847,6 +2022,10 @@ def upload_file():
                     "uses": get_swce_usage("Lonsdale Quay"),
                     "lat": 49.310161,
                     "lon": -123.083358,
+                    **{
+                        f"last_used_{key}": value
+                        for key, value in get_swce_last_used("Lonsdale Quay").items()
+                    },
                 },
                 {
                     "name": "Waterfront",
@@ -1854,6 +2033,10 @@ def upload_file():
                     "uses": get_swce_usage("Waterfront Stn - WCE", "Waterfront Station"),
                     "lat": 49.286053,
                     "lon": -123.11158,
+                    **{
+                        f"last_used_{key}": value
+                        for key, value in get_swce_last_used("Waterfront Stn - WCE", "Waterfront Station").items()
+                    },
                 },
                 {
                     "name": "Moody Centre",
@@ -1861,6 +2044,10 @@ def upload_file():
                     "uses": get_swce_usage("Moody Centre Station", "Moody Center Station"),
                     "lat": 49.278067,
                     "lon": -122.846248,
+                    **{
+                        f"last_used_{key}": value
+                        for key, value in get_swce_last_used("Moody Centre Station", "Moody Center Station").items()
+                    },
                 },
                 {
                     "name": "Coquitlam Central",
@@ -1868,6 +2055,10 @@ def upload_file():
                     "uses": get_swce_usage("Coquitlam Central Station"),
                     "lat": 49.273909,
                     "lon": -122.800056,
+                    **{
+                        f"last_used_{key}": value
+                        for key, value in get_swce_last_used("Coquitlam Central Station").items()
+                    },
                 },
                 {
                     "name": "Port Coquitlam",
@@ -1875,6 +2066,10 @@ def upload_file():
                     "uses": get_swce_usage("Port Coquitlam Station"),
                     "lat": 49.261481,
                     "lon": -122.77402,
+                    **{
+                        f"last_used_{key}": value
+                        for key, value in get_swce_last_used("Port Coquitlam Station").items()
+                    },
                 },
                 {
                     "name": "Pitt Meadows",
@@ -1882,6 +2077,10 @@ def upload_file():
                     "uses": get_swce_usage("Pitt Meadows Station"),
                     "lat": 49.225772,
                     "lon": -122.688381,
+                    **{
+                        f"last_used_{key}": value
+                        for key, value in get_swce_last_used("Pitt Meadows Station").items()
+                    },
                 },
                 {
                     "name": "Maple Meadows",
@@ -1889,6 +2088,10 @@ def upload_file():
                     "uses": get_swce_usage("Maple Meadows Station"),
                     "lat": 49.216465,
                     "lon": -122.666097,
+                    **{
+                        f"last_used_{key}": value
+                        for key, value in get_swce_last_used("Maple Meadows Station").items()
+                    },
                 },
                 {
                     "name": "Port Haney",
@@ -1896,6 +2099,10 @@ def upload_file():
                     "uses": get_swce_usage("Port Haney Station"),
                     "lat": 49.212168,
                     "lon": -122.605242,
+                    **{
+                        f"last_used_{key}": value
+                        for key, value in get_swce_last_used("Port Haney Station").items()
+                    },
                 },
                 {
                     "name": "Mission City",
@@ -1903,6 +2110,10 @@ def upload_file():
                     "uses": get_swce_usage("Mission City Station"),
                     "lat": 49.133594,
                     "lon": -122.30486,
+                    **{
+                        f"last_used_{key}": value
+                        for key, value in get_swce_last_used("Mission City Station").items()
+                    },
                 },
             ]
 

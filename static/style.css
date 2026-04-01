@@ -345,6 +345,26 @@ button:hover {
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
+.howto-mobile-shot {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .howto-desktop-shot {
+        display: none;
+    }
+
+    .howto-mobile-shot {
+        display: block;
+    }
+
+    .howto-image img {
+        width: 95%;
+        max-width: 520px;
+        min-width: 0;
+    }
+}
+
 .caption {
     font-size: 0.9em;
     margin-top: 0.5em;

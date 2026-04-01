@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>More Compass Wrapped Summary</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .compare-card {
@@ -122,23 +123,131 @@
             border-color: #009cde;
         }
 
+        .legend-swatch.station-shared {
+            background: #22c55e;
+        }
+
+        .legend-swatch.station-only-a {
+            background: #3b82f6;
+        }
+
+        .legend-swatch.station-only-b {
+            background: #facc15;
+        }
+
+        .legend-swatch.station-shared-trip {
+            background: #86efac;
+        }
+
+        .legend-swatch.station-unused {
+            background: #9ca3af;
+        }
+
+        .ranked-map-marker.compare-map-marker {
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 7px rgba(15, 23, 42, 0.3);
+        }
+
+        .ranked-map-marker.compare-map-marker span {
+            display: none;
+        }
+
+        .ranked-map-marker.compare-map-marker.station-shared {
+            background: #22c55e;
+        }
+
+        .ranked-map-marker.compare-map-marker.station-only-a {
+            background: #3b82f6;
+        }
+
+        .ranked-map-marker.compare-map-marker.station-only-b {
+            background: #facc15;
+        }
+
+        .ranked-map-marker.compare-map-marker.station-shared-trip {
+            background: #86efac;
+        }
+
+        .ranked-map-marker.compare-map-marker.station-unused {
+            background: #9ca3af;
+        }
+
+        .compare-map-status {
+            margin-top: 8px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .carousel-viewport {
+            transition: height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .carousel {
+            transition: transform 0.35s ease, height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        #unusedAllStationsList {
+            width: 75%;
+            margin: 20px auto;
+            text-align: left;
+            transform: translateX(0);
+        }
+
+        #unusedAllStationsList li {
+            text-align: left;
+        }
+
         @media (max-width: 900px) {
             .carousel-viewport {
-                transition: height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
                 touch-action: pan-y;
-            }
-
-            .carousel {
-                transition: transform 0.35s ease, height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
             }
 
             .hour-mobile-toggle {
                 display: flex;
             }
         }
+
+        @media (max-width: 1000px) {
+            .results-sidebar .sidebar-toggle {
+                display: flex;
+            }
+        }
+
+        .sidebar-link.is-disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        .sidebar-group-toggle:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
+    <nav id="resultsSidebar" class="results-sidebar">
+        <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Toggle sidebar">☰</button>
+        <ul class="sidebar-nav">
+            <li><a href="#section-summary" class="sidebar-link" data-section="section-summary">Summary</a></li>
+            <li><a href="#more-usage-carousel" class="sidebar-link" data-section="more-usage-carousel">Usage Carousel</a></li>
+            <li><a href="#more-pie-carousel" class="sidebar-link" data-section="more-pie-carousel">Pie Carousel</a></li>
+            <li><a href="#section-compare" class="sidebar-link" data-section="section-compare">Compare</a></li>
+            <li class="sidebar-group">
+                <button id="sidebarCompareToggle" class="sidebar-group-toggle" type="button" aria-expanded="false">
+                    Compare Details <span class="sidebar-arrow">▾</span>
+                </button>
+                <ul id="sidebarCompareMenu" class="sidebar-submenu">
+                    <li><a href="#sharedTripsBlueCard" class="sidebar-link sidebar-sublink" data-section="sharedTripsBlueCard" data-requires-compare="true">Shared Trips</a></li>
+                    <li><a href="#sharedStationsMapCard" class="sidebar-link sidebar-sublink" data-section="sharedStationsMapCard" data-requires-compare="true">Shared Map</a></li>
+                </ul>
+            </li>
+        </ul>
+    </nav>
+    <div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
+
     <div class="results-card-2" id="section-summary">
         <h1>
             You have taken a total of
@@ -206,6 +315,14 @@
                         <canvas id="moreMonthChart"></canvas>
                     </div>
                 </div>
+
+                <div class="slide">
+                    <h2>Unused SkyTrain Stations (All File Uploads)</h2>
+                    <ul id="unusedAllStationsList" class="unused-list"></ul>
+                    <p id="unusedAllStationsEmpty" class="sub" style="display: none;">
+                        All SkyTrain stations were used at least once across uploaded CSVs.
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -214,6 +331,7 @@
             <span class="indicator" data-index="1">●</span>
             <span class="indicator" data-index="2">●</span>
             <span class="indicator" data-index="3">●</span>
+            <span class="indicator" data-index="4">●</span>
         </div>
 
         <button class="carousel-btn left" id="moreCarouselPrev" type="button">❮</button>
@@ -277,7 +395,7 @@
         <button class="carousel-btn right" id="morePieCarouselNext" type="button">❯</button>
     </div>
 
-    <div class="card compare-card">
+    <div class="card compare-card" id="section-compare">
         <h2>Compare CSV Files</h2>
         <p class="sub">Select exactly 2 CSV files to see shared trips (same tap name within 2 minutes).</p>
         <div id="compareCsvButtons" class="compare-csv-buttons"></div>
@@ -338,8 +456,23 @@
         <p class="sub" id="sharedTripsCombinedText">Shared trips are 0.0% of file A and 0.0% of file B.</p>
     </div>
 
+    <div class="results-card map-card" id="sharedStationsMapCard" style="display: none;">
+        <h2>Shared Stations Map</h2>
+        <p class="map-subtitle" id="sharedStationsMapSubtitle">Stations visited by CSV A and CSV B.</p>
+        <div class="map-legend">
+            <div class="legend-item"><span class="legend-swatch station-shared-trip"></span>Shared trip stations</div>
+            <div class="legend-item"><span class="legend-swatch station-shared"></span>Visited by both</div>
+            <div class="legend-item"><span class="legend-swatch station-only-a"></span>Only CSV A</div>
+            <div class="legend-item"><span class="legend-swatch station-only-b"></span>Only CSV B</div>
+            <div class="legend-item"><span class="legend-swatch station-unused"></span>Unused by both</div>
+        </div>
+        <div id="sharedStationsMap" class="top-stops-map"></div>
+        <p class="compare-map-status" id="sharedStationsMapStatus"></p>
+    </div>
+
     <a href="/more" class="button-card button-small">&laquo; Back to More Compass Wrapped</a>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script>
         const stationLabels = {{ station_labels|tojson }};
         const hourLabels = {{ hour_labels|tojson }};
@@ -360,6 +493,9 @@
         const pieWce = {{ pie_wce|tojson }};
         const compareTapData = {{ compare_tap_data|tojson }};
         const sharedPairMetrics = {{ shared_pair_metrics|tojson }};
+        const mapStationPoints = {{ map_station_points|tojson }};
+        const mapFileStationNames = {{ map_file_station_names|tojson }};
+        const sharedPairStationNames = {{ shared_pair_station_names|tojson }};
 
         function stackedTooltipConfig() {
             return {
@@ -761,9 +897,181 @@
         const sharedTripsMins = document.getElementById("sharedTripsMins");
         const sharedTripsComparedLabel = document.getElementById("sharedTripsComparedLabel");
         const sharedTripsCombinedText = document.getElementById("sharedTripsCombinedText");
+        const sharedStationsMapCard = document.getElementById("sharedStationsMapCard");
+        const sharedStationsMapSubtitle = document.getElementById("sharedStationsMapSubtitle");
+        const sharedStationsMapStatus = document.getElementById("sharedStationsMapStatus");
+        const unusedAllStationsList = document.getElementById("unusedAllStationsList");
+        const unusedAllStationsEmpty = document.getElementById("unusedAllStationsEmpty");
         const selectedCompareIndices = [];
         const isExactlyTwoCsvs = pieLabels.length === 2;
         let latestSharedMatches = [];
+        let sharedStationsMap = null;
+        let sharedStationsMarkers = [];
+
+        function renderUnusedStationsAcrossAllCsvs() {
+            if (!unusedAllStationsList || !unusedAllStationsEmpty) {
+                return;
+            }
+
+            const allVisitedStations = new Set();
+            (mapFileStationNames || []).forEach((fileStations) => {
+                if (!Array.isArray(fileStations)) {
+                    return;
+                }
+                fileStations.forEach((name) => allVisitedStations.add(name));
+            });
+
+            const unusedStations = (mapStationPoints || [])
+                .filter((point) => !allVisitedStations.has(point.source_name))
+                .map((point) => point.name)
+                .sort((a, b) => a.localeCompare(b));
+
+            unusedAllStationsList.innerHTML = "";
+            if (!unusedStations.length) {
+                unusedAllStationsEmpty.style.display = "block";
+                return;
+            }
+
+            unusedAllStationsEmpty.style.display = "none";
+            unusedStations.forEach((stationName) => {
+                const li = document.createElement("li");
+                li.textContent = stationName;
+                unusedAllStationsList.appendChild(li);
+            });
+        }
+
+        function getStationCategoryName(categoryClass) {
+            if (categoryClass === "station-shared-trip") return "Shared trip station";
+            if (categoryClass === "station-shared") return "Visited by both";
+            if (categoryClass === "station-only-a") return "Only CSV A";
+            if (categoryClass === "station-only-b") return "Only CSV B";
+            return "Unused by both";
+        }
+
+        function createCompareStationIcon(categoryClass) {
+            const markerSize = window.matchMedia("(max-width: 900px)").matches ? 16 : 18;
+            const markerAnchor = markerSize / 2;
+            return L.divIcon({
+                className: "",
+                html: `<div class="ranked-map-marker compare-map-marker ${categoryClass}"><span></span></div>`,
+                iconSize: [markerSize, markerSize],
+                iconAnchor: [markerAnchor, markerAnchor],
+                popupAnchor: [0, -markerAnchor],
+            });
+        }
+
+        function clearSharedStationsMarkers() {
+            if (!sharedStationsMap) {
+                return;
+            }
+
+            sharedStationsMarkers.forEach((marker) => {
+                sharedStationsMap.removeLayer(marker);
+            });
+            sharedStationsMarkers = [];
+        }
+
+        function ensureSharedStationsMap() {
+            if (sharedStationsMap || !window.L) {
+                return;
+            }
+
+            sharedStationsMap = L.map("sharedStationsMap", {
+                scrollWheelZoom: true,
+            });
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap contributors",
+            }).addTo(sharedStationsMap);
+        }
+
+        function renderSharedStationsMap(aIndex, bIndex) {
+            if (aIndex === undefined || bIndex === undefined) {
+                sharedStationsMapCard.style.display = "none";
+                return;
+            }
+
+            if (!Array.isArray(mapStationPoints) || !mapStationPoints.length) {
+                sharedStationsMapCard.style.display = "none";
+                return;
+            }
+
+            sharedStationsMapCard.style.display = "block";
+            ensureSharedStationsMap();
+
+            if (!sharedStationsMap) {
+                sharedStationsMapStatus.textContent = "Map is unavailable.";
+                return;
+            }
+
+            const fileA = compareTapData[aIndex];
+            const fileB = compareTapData[bIndex];
+            sharedStationsMapSubtitle.textContent = `Station coverage for CSV A (${fileA.label}) vs CSV B (${fileB.label}).`;
+
+            const visitedA = new Set(Array.isArray(mapFileStationNames[aIndex]) ? mapFileStationNames[aIndex] : []);
+            const visitedB = new Set(Array.isArray(mapFileStationNames[bIndex]) ? mapFileStationNames[bIndex] : []);
+            const pairKey = aIndex < bIndex ? `${aIndex}-${bIndex}` : `${bIndex}-${aIndex}`;
+            const sharedTripsSet = new Set(Array.isArray(sharedPairStationNames[pairKey]) ? sharedPairStationNames[pairKey] : []);
+
+            clearSharedStationsMarkers();
+
+            const bounds = [];
+            const categoryCounts = {
+                sharedTrip: 0,
+                shared: 0,
+                onlyA: 0,
+                onlyB: 0,
+                unused: 0,
+            };
+
+            mapStationPoints.forEach((point) => {
+                const inA = visitedA.has(point.source_name);
+                const inB = visitedB.has(point.source_name);
+                const inSharedTrips = sharedTripsSet.has(point.source_name);
+
+                let categoryClass = "station-unused";
+                if (inSharedTrips && inA && inB) {
+                    categoryClass = "station-shared-trip";
+                    categoryCounts.sharedTrip += 1;
+                } else if (inA && inB) {
+                    categoryClass = "station-shared";
+                    categoryCounts.shared += 1;
+                } else if (inA) {
+                    categoryClass = "station-only-a";
+                    categoryCounts.onlyA += 1;
+                } else if (inB) {
+                    categoryClass = "station-only-b";
+                    categoryCounts.onlyB += 1;
+                } else {
+                    categoryCounts.unused += 1;
+                }
+
+                const marker = L.marker([point.lat, point.lon], {
+                    icon: createCompareStationIcon(categoryClass),
+                    zIndexOffset: categoryClass === "station-shared" ? 2000 : 1000,
+                }).addTo(sharedStationsMap);
+
+                marker.bindPopup(
+                    `<div class="map-popup-title">${point.name}</div><div class="map-popup-meta">${getStationCategoryName(categoryClass)}</div>`
+                );
+
+                sharedStationsMarkers.push(marker);
+                bounds.push([point.lat, point.lon]);
+            });
+
+            sharedStationsMapStatus.textContent = `Shared Trips: ${categoryCounts.sharedTrip} | Both: ${categoryCounts.shared} | Only CSV A: ${categoryCounts.onlyA} | Only CSV B: ${categoryCounts.onlyB} | Unused: ${categoryCounts.unused}`;
+
+            if (bounds.length === 1) {
+                sharedStationsMap.setView(bounds[0], 12);
+            } else if (bounds.length > 1) {
+                sharedStationsMap.fitBounds(bounds, { padding: [30, 30] });
+            }
+
+            setTimeout(() => {
+                sharedStationsMap.invalidateSize();
+            }, 0);
+        }
 
         function formatTimestampForExport(isoTimestamp) {
             const dt = new Date(isoTimestamp);
@@ -1229,6 +1537,7 @@
             if (selectedCompareIndices.length !== 2) {
                 sharedTripsSummary.textContent = "Shared trips table will appear after selecting 2 CSV files.";
                 sharedTripsBlueCard.style.display = "none";
+                sharedStationsMapCard.style.display = "none";
                 latestSharedMatches = [];
                 downloadSharedCsvABtn.style.display = "none";
                 downloadSharedCsvBBtn.style.display = "none";
@@ -1261,6 +1570,7 @@
             sharedTripsSummary.textContent = `Shared trips (${latestSharedMatches.length} rows) | CSV A: ${fileA.label} | CSV B: ${fileB.label}`;
 
             sharedTripsBlueCard.style.display = "block";
+            renderSharedStationsMap(aIndex, bIndex);
             sharedTripsCountValue.textContent = String(pairStats.trips || 0);
             sharedTripsPercentSsw.textContent = `${Number(pairStats.percent_ssw || 0).toFixed(1)}%`;
             sharedTripsSswCount.textContent = String(pairStats.ssw_trips || 0);
@@ -1367,6 +1677,7 @@
                 }
             }
 
+            syncCompareSidebarMenuState();
             renderSharedTrips();
             adjustMoreCarouselHeight();
             adjustPieCarouselHeight();
@@ -1415,7 +1726,7 @@
         const moreViewport = document.querySelector("#more-usage-carousel .carousel-viewport");
         const moreSlides = Array.from(moreTrack.querySelectorAll(".slide"));
         const moreIndicators = Array.from(document.querySelectorAll("#moreCarouselIndicators .indicator"));
-        const slideCount = 4;
+        const slideCount = 5;
         let moreIndex = 0;
 
         function adjustMoreCarouselHeight() {
@@ -1551,6 +1862,222 @@
             adjustPieCarouselHeight();
         }
 
+        const resultsSidebar = document.getElementById("resultsSidebar");
+        const sidebarToggle = document.getElementById("sidebarToggle");
+        const sidebarOverlay = document.getElementById("sidebarOverlay");
+        const sidebarCompareToggle = document.getElementById("sidebarCompareToggle");
+        const sidebarCompareMenu = document.getElementById("sidebarCompareMenu");
+        const sidebarLinks = Array.from(document.querySelectorAll(".sidebar-link[data-section]"));
+        const sidebarCompareLinks = Array.from(document.querySelectorAll(".sidebar-link[data-requires-compare='true']"));
+
+        function hasSelectedComparePair() {
+            return selectedCompareIndices.length === 2;
+        }
+
+        function closeCompareSidebarMenu() {
+            if (!sidebarCompareMenu || !sidebarCompareToggle) {
+                return;
+            }
+            sidebarCompareMenu.classList.remove("open");
+            sidebarCompareToggle.classList.remove("open");
+            sidebarCompareToggle.setAttribute("aria-expanded", "false");
+        }
+
+        function syncCompareSidebarMenuState() {
+            if (!sidebarCompareToggle || !sidebarCompareMenu) {
+                return;
+            }
+
+            const ready = hasSelectedComparePair();
+            sidebarCompareToggle.disabled = !ready;
+            sidebarCompareToggle.setAttribute("aria-disabled", String(!ready));
+            sidebarCompareLinks.forEach((link) => {
+                link.classList.toggle("is-disabled", !ready);
+            });
+
+            if (!ready) {
+                closeCompareSidebarMenu();
+            }
+        }
+
+        function isSidebarLinkEnabled(link) {
+            if (!link) {
+                return false;
+            }
+            if (link.getAttribute("data-requires-compare") === "true") {
+                return hasSelectedComparePair();
+            }
+            return true;
+        }
+
+        function isPhoneSidebarMode() {
+            return window.matchMedia("(max-width: 1000px)").matches;
+        }
+
+        function openSidebar() {
+            if (!resultsSidebar) {
+                return;
+            }
+            resultsSidebar.classList.remove("collapsed");
+            if (isPhoneSidebarMode()) {
+                document.body.classList.add("sidebar-open");
+            }
+        }
+
+        function closeSidebar() {
+            if (!resultsSidebar) {
+                return;
+            }
+            resultsSidebar.classList.add("collapsed");
+            document.body.classList.remove("sidebar-open");
+        }
+
+        function syncSidebarForViewport() {
+            if (!resultsSidebar) {
+                return;
+            }
+            if (isPhoneSidebarMode()) {
+                resultsSidebar.classList.add("collapsed");
+                document.body.classList.remove("sidebar-open");
+            } else {
+                resultsSidebar.classList.remove("collapsed");
+                document.body.classList.remove("sidebar-open");
+            }
+        }
+
+        function updateActiveSidebarSection() {
+            if (!sidebarLinks.length) {
+                return;
+            }
+
+            let activeId = "section-summary";
+            let bestDistance = Number.POSITIVE_INFINITY;
+
+            sidebarLinks.forEach((link) => {
+                if (!isSidebarLinkEnabled(link)) {
+                    return;
+                }
+
+                const sectionId = link.getAttribute("data-section");
+                const section = document.getElementById(sectionId);
+                if (!section) {
+                    return;
+                }
+
+                const rect = section.getBoundingClientRect();
+                const distance = Math.abs(rect.top - 120);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    activeId = sectionId;
+                }
+            });
+
+            sidebarLinks.forEach((link) => {
+                link.classList.toggle("active", link.getAttribute("data-section") === activeId);
+            });
+        }
+
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener("click", () => {
+                if (resultsSidebar?.classList.contains("collapsed")) {
+                    openSidebar();
+                } else {
+                    closeSidebar();
+                }
+            });
+        }
+
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener("click", closeSidebar);
+        }
+
+        // Mobile edge-swipe: swipe right from the left edge to reveal the sidebar.
+        let sidebarSwipeStartX = 0;
+        let sidebarSwipeStartY = 0;
+        let sidebarSwipeTracking = false;
+
+        function isSidebarSwipeExcludedTarget(target) {
+            if (!(target instanceof Element)) {
+                return false;
+            }
+
+            return Boolean(target.closest(
+                ".carousel-container, .carousel-viewport, #sharedTripsDetails, .shared-trips-table-wrap, .shared-trips-table, #sharedStationsMap, .leaflet-container"
+            ));
+        }
+
+        document.addEventListener("touchstart", (event) => {
+            if (!isPhoneSidebarMode() || !event.touches.length) {
+                sidebarSwipeTracking = false;
+                return;
+            }
+
+            const touch = event.touches[0];
+            sidebarSwipeStartX = touch.clientX;
+            sidebarSwipeStartY = touch.clientY;
+
+            const sidebarIsCollapsed = resultsSidebar?.classList.contains("collapsed");
+            const isExcludedTarget = isSidebarSwipeExcludedTarget(event.target);
+            sidebarSwipeTracking = Boolean(sidebarIsCollapsed) && !isExcludedTarget;
+        }, { passive: true });
+
+        document.addEventListener("touchend", (event) => {
+            if (!sidebarSwipeTracking || !event.changedTouches.length) {
+                sidebarSwipeTracking = false;
+                return;
+            }
+
+            const touch = event.changedTouches[0];
+            const deltaX = touch.clientX - sidebarSwipeStartX;
+            const deltaY = touch.clientY - sidebarSwipeStartY;
+
+            const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+            if (isHorizontal && deltaX > 50) {
+                openSidebar();
+            }
+
+            sidebarSwipeTracking = false;
+        }, { passive: true });
+
+        if (sidebarCompareToggle) {
+            sidebarCompareToggle.addEventListener("click", () => {
+                if (!hasSelectedComparePair() || !sidebarCompareMenu) {
+                    return;
+                }
+
+                const willOpen = !sidebarCompareMenu.classList.contains("open");
+                sidebarCompareMenu.classList.toggle("open", willOpen);
+                sidebarCompareToggle.classList.toggle("open", willOpen);
+                sidebarCompareToggle.setAttribute("aria-expanded", String(willOpen));
+            });
+        }
+
+        sidebarLinks.forEach((link) => {
+            link.addEventListener("click", (event) => {
+                if (!isSidebarLinkEnabled(link)) {
+                    event.preventDefault();
+                    return;
+                }
+
+                const sectionId = link.getAttribute("data-section");
+                const section = sectionId ? document.getElementById(sectionId) : null;
+
+                if (section) {
+                    event.preventDefault();
+                    section.scrollIntoView({ behavior: "smooth", block: "start" });
+
+                    // Keep URL clean so sidebar navigation does not create back-stack hash entries.
+                    if (window.location.hash) {
+                        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+                    }
+                }
+
+                if (isPhoneSidebarMode()) {
+                    closeSidebar();
+                }
+            });
+        });
+
         document.getElementById("morePieCarouselPrev").addEventListener("click", () => {
             pieIndex = (pieIndex - 1 + pieSlideCount) % pieSlideCount;
             renderPieSlide();
@@ -1579,17 +2106,45 @@
         window.addEventListener("resize", () => {
             adjustMoreCarouselHeight();
             adjustPieCarouselHeight();
+            if (sharedStationsMap) {
+                sharedStationsMap.invalidateSize();
+            }
+            syncSidebarForViewport();
+            updateActiveSidebarSection();
+        });
+
+        window.addEventListener("scroll", updateActiveSidebarSection, { passive: true });
+
+        window.addEventListener("hashchange", () => {
+            // If user presses browser Back into old sidebar hash states, jump straight to /more.
+            if (window.location.hash) {
+                window.location.replace("/more");
+            }
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                closeSidebar();
+            }
         });
 
         if (hourAmBtn && hourPmBtn && isMobileView) {
             applyHourMode("am");
         }
 
+        if (window.location.hash) {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+
         setTimeout(adjustMoreCarouselHeight, 0);
         setTimeout(adjustPieCarouselHeight, 0);
+        renderUnusedStationsAcrossAllCsvs();
         renderMoreSlide();
         renderPieSlide();
         applyCompareSelection();
+        closeCompareSidebarMenu();
+        syncSidebarForViewport();
+        updateActiveSidebarSection();
     </script>
 </body>
 </html>

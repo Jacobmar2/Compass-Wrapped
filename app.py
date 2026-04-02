@@ -1316,11 +1316,143 @@ def more_upload_slideshow():
 
     selected_name = secure_filename(uploaded.filename)
 
+    try:
+        rows = parse_uploaded_csv_rows(uploaded)
+    except UnicodeDecodeError:
+        flash("CSV must be UTF-8 encoded.")
+        return redirect(url_for("more"))
+    except csv.Error:
+        flash("CSV parsing failed due to malformed CSV structure.")
+        return redirect(url_for("more"))
+
+    slideshow_steps = build_slideshow_steps_from_rows(rows)
+
+    if not slideshow_steps:
+        flash("No slideshow rows found. Use a Compass CSV with transit tap rows.")
+        return redirect(url_for("more"))
+
     return render_template(
-        "more_todo.html",
-        message="also todo soon, only 1 csv like original upload",
-        upload_detail=f"Selected CSV file: {selected_name}",
+        "more_slideshow.html",
+        selected_name=selected_name,
+        slideshow_steps=slideshow_steps,
     )
+
+
+SLIDESHOW_EXCLUDED_KEYWORDS = ("loaded", "sv", "cos", "purchase")
+
+
+def should_exclude_slideshow_action(action_text):
+    lowered = str(action_text).lower()
+    return any(keyword in lowered for keyword in SLIDESHOW_EXCLUDED_KEYWORDS)
+
+
+def classify_slideshow_marker_type(action_text, tap_name):
+    lowered_action = str(action_text).lower()
+    lowered_name = str(tap_name).lower()
+
+    if "bus stop" in lowered_action or "bus stop" in lowered_name:
+        return "bus"
+    if lowered_name.endswith("quay"):
+        return "seabus"
+    if "wce" in lowered_action or "wce" in lowered_name:
+        return "wce"
+    if lowered_name.endswith("station"):
+        return "wce"
+    if lowered_name.endswith("stn"):
+        return "station"
+    return "station"
+
+
+def resolve_slideshow_location(action_text):
+    text = str(action_text).strip()
+    if not text:
+        return {
+            "display_name": "Unknown",
+            "warning": "stop Unknown not found",
+            "location": None,
+            "marker_type": "station",
+        }
+
+    if " at " in text:
+        tap_name = text.split(" at ", 1)[1].strip()
+    else:
+        tap_name = text
+
+    marker_type = classify_slideshow_marker_type(text, tap_name)
+
+    if marker_type == "bus":
+        code_match = re.search(r"\d{5}", text)
+        stop_code = code_match.group() if code_match else ""
+        display_name = stop_code if stop_code else tap_name
+        location = utils.get_bus_stop_location(stop_code) if stop_code else None
+        if location:
+            return {
+                "display_name": location["name"],
+                "warning": "",
+                "location": location,
+                "marker_type": marker_type,
+            }
+        return {
+            "display_name": display_name,
+            "warning": f"stop {display_name} not found",
+            "location": None,
+            "marker_type": marker_type,
+        }
+
+    clean_name = tap_name.replace("(Missing)", "").strip() if tap_name else ""
+    if not clean_name:
+        clean_name = "Unknown"
+    location = utils.get_station_location(clean_name)
+    if location:
+        return {
+            "display_name": clean_name,
+            "warning": "",
+            "location": location,
+            "marker_type": marker_type,
+        }
+
+    return {
+        "display_name": clean_name,
+        "warning": f"stop {clean_name} not found",
+        "location": None,
+        "marker_type": marker_type,
+    }
+
+
+def build_slideshow_steps_from_rows(rows):
+    if len(rows) <= 1:
+        return []
+
+    steps = []
+    for row in rows[1:]:
+        if len(row) < 2:
+            continue
+
+        timestamp_text = str(row[0]).strip()
+        action_text = str(row[1]).strip()
+
+        if not action_text:
+            break
+
+        if should_exclude_slideshow_action(action_text):
+            continue
+
+        resolved = resolve_slideshow_location(action_text)
+        location = resolved["location"]
+
+        step = {
+            "timestamp": timestamp_text,
+            "action": action_text,
+            "name": resolved["display_name"],
+            "marker_type": resolved["marker_type"],
+            "warning": resolved["warning"],
+            "found": bool(location),
+            "lat": location["lat"] if location else None,
+            "lon": location["lon"] if location else None,
+        }
+        steps.append(step)
+
+    return steps
 
 
 @app.route("/", methods=["GET", "POST"])

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compass Slideshow</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            background: #0b1720;
+            color: #f3faff;
+            overflow: hidden;
+        }
+
+        .slideshow-shell {
+            height: calc(100vh + 10px);
+            margin-top: -30px;
+            display: grid;
+            grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
+            gap: 0;
+        }
+
+        .slideshow-main {
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 12px 14px;
+            background: radial-gradient(circle at 20% 15%, rgba(31, 84, 115, 0.7), rgba(7, 20, 30, 0.96));
+            overflow: hidden;
+        }
+
+        .slideshow-title {
+            margin: 0 0 12px 0;
+            text-align: left;
+            font-size: 1.7rem;
+            letter-spacing: 0.02em;
+        }
+
+        .slideshow-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+            padding: 0 6px 4px 6px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .slideshow-mode-toggle {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-start;
+            margin: 14px 0 0 0;
+            flex-wrap: wrap;
+        }
+
+        .slideshow-theme-toggle {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-start;
+            margin: 8px 0 0 0;
+            flex-wrap: wrap;
+        }
+
+        .slideshow-mode-btn {
+            margin: 0;
+            color: #e9f7ff;
+            border-color: rgba(255, 255, 255, 0.7);
+            background-color: rgba(255, 255, 255, 0.14);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+        }
+
+        .slideshow-mode-btn:hover {
+            color: #ffffff;
+            border-color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .slideshow-mode-btn.active {
+            background-color: white;
+            color: #009cde;
+            border-color: white;
+            font-weight: bold;
+        }
+
+        .slideshow-controls button {
+            margin: 0;
+            width: auto;
+            flex: 0 0 auto;
+            min-width: 52px;
+            padding: 8px 10px;
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        .slideshow-slider {
+            flex: 1;
+            min-width: 0;
+            accent-color: #009cde;
+        }
+
+        .slideshow-slider.single-tap {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+        }
+
+        .slideshow-slider.single-tap::-webkit-slider-runnable-track {
+            height: 5px;
+            border-radius: 999px;
+            background: #009cde;
+        }
+
+        .slideshow-slider.single-tap::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 0;
+            height: 0;
+            border: 0;
+            box-shadow: none;
+            background: transparent;
+        }
+
+        .slideshow-slider.single-tap::-moz-range-track {
+            height: 5px;
+            border-radius: 999px;
+            border: 0;
+            background: #009cde;
+        }
+
+        .slideshow-slider.single-tap::-moz-range-thumb {
+            width: 0;
+            height: 0;
+            border: 0;
+            box-shadow: none;
+            background: transparent;
+        }
+
+        .slideshow-slider.single-tap::-moz-range-progress {
+            height: 5px;
+            border-radius: 999px;
+            background: #009cde;
+        }
+
+        .slideshow-meta {
+            margin-top: 6px;
+            font-weight: 700;
+            color: #e8f7ff;
+        }
+
+        .slideshow-action {
+            margin-top: 10px;
+            color: #f5fcff;
+        }
+
+        .slideshow-since {
+            margin-top: 8px;
+            font-weight: bold;
+            color: #f5fcff;
+        }
+
+        .slideshow-warning {
+            margin-top: 10px;
+            min-height: 1.4em;
+            color: #ffe08a;
+            font-weight: 700;
+        }
+
+        .slideshow-warning.hidden {
+            visibility: hidden;
+        }
+
+        .slideshow-side {
+            min-height: 0;
+            overflow-y: auto;
+            padding: 18px 16px 16px 16px;
+            background: rgba(8, 20, 29, 0.98);
+            border-left: 1px solid rgba(255, 255, 255, 0.12);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .slideshow-file {
+            margin: 0 0 6px 0;
+            color: #cfe9f8;
+        }
+
+        .slideshow-map-wrap {
+            flex: 0 0 auto;
+            height: min(100%, calc(100vh - 140px));
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        #slideshowMap {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            aspect-ratio: auto;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2);
+        }
+
+        .map-legend {
+            justify-content: flex-start;
+            margin: 0;
+        }
+
+        .legend-item {
+            font-size: 0.95rem;
+        }
+
+        .slideshow-back {
+            margin-top: auto;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .slideshow-calendar-panel {
+            margin-top: 12px;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .slideshow-calendar-title {
+            margin: 0 0 8px 0;
+            font-weight: 700;
+        }
+
+        .slideshow-calendar-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .slideshow-calendar-nav button {
+            margin: 0;
+            min-width: 36px;
+            padding: 4px 8px;
+            font-size: 0.95rem;
+            line-height: 1;
+        }
+
+        .slideshow-calendar-month {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #e8f7ff;
+        }
+
+        .slideshow-calendar-weekdays,
+        .slideshow-calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 4px;
+        }
+
+        .slideshow-calendar-weekday {
+            text-align: center;
+            font-size: 0.72rem;
+            color: #cfe9f8;
+        }
+
+        .slideshow-calendar-day {
+            margin: 0;
+            width: 100%;
+            padding: 6px 0;
+            text-align: center;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e8f7ff;
+            font-size: 0.82rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .slideshow-calendar-day.empty {
+            border-color: transparent;
+            background: transparent;
+            cursor: default;
+        }
+
+        .slideshow-calendar-day.has-data {
+            border-color: rgba(61, 211, 255, 0.85);
+            background: rgba(61, 211, 255, 0.2);
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        .slideshow-calendar-day.selected {
+            border-color: #ffffff;
+            background: #ffffff;
+            color: #009cde;
+            font-weight: 700;
+        }
+
+        .slideshow-calendar-day.current-step-day {
+            border-color: #009cde;
+            background: #009cde;
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        .slideshow-calendar-clear {
+            margin-top: 8px;
+            width: 100%;
+            padding: 6px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            background: rgba(255, 255, 255, 0.12);
+            color: #f3faff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .slideshow-calendar-custom {
+            margin-top: 8px;
+            width: 100%;
+            padding: 6px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            background: rgba(255, 255, 255, 0.12);
+            color: #f3faff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .slideshow-calendar-range-status {
+            margin-top: 6px;
+            font-size: 0.78rem;
+            color: #d4ecf8;
+            min-height: 1.1em;
+        }
+
+        .slideshow-calendar-day.in-range {
+            border-color: #ffffff;
+            background: #ffffff;
+            color: #009cde;
+            font-weight: 700;
+        }
+
+        .slideshow-calendar-day.current-step-day.in-range,
+        .slideshow-calendar-day.current-step-day.selected,
+        .slideshow-calendar-day.current-step-day.in-range.selected {
+            border-color: #009cde;
+            background: #009cde;
+            color: #ffffff;
+        }
+
+        .slideshow-back .button-card {
+            margin: 0;
+            padding: 18px 18px;
+            font-size: 1rem;
+            line-height: 1.15;
+            width: auto;
+            max-width: 300px;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                overflow: auto;
+            }
+
+            .slideshow-shell {
+                grid-template-columns: 1fr;
+                grid-template-rows: minmax(68vh, 1fr) auto;
+                min-height: 100vh;
+                height: auto;
+                margin-top: 6px;
+            }
+
+            .slideshow-main {
+                min-height: 68vh;
+                padding: 12px;
+            }
+
+            .slideshow-map-wrap {
+                height: min(100%, calc(68vh - 110px));
+            }
+
+            .slideshow-side {
+                border-left: none;
+                border-top: 1px solid rgba(255, 255, 255, 0.12);
+                padding: 14px 12px 18px 12px;
+            }
+
+            .slideshow-controls button {
+                min-width: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="slideshow-shell">
+        <section class="slideshow-main" aria-label="Main map component">
+            <h2 class="slideshow-title">Compass Slideshow Map</h2>
+            <div class="slideshow-map-wrap">
+                <div id="slideshowMap" class="top-stops-map"></div>
+            </div>
+
+            <div class="slideshow-controls">
+                <button id="slideshowPrev" type="button" aria-label="Previous trip">&lt;</button>
+                <input id="slideshowSlider" class="slideshow-slider" type="range" min="0" max="{{ slideshow_steps|length - 1 }}" value="0" step="1">
+                <button id="slideshowNext" type="button" aria-label="Next trip">&gt;</button>
+            </div>
+        </section>
+
+        <aside class="slideshow-side" aria-label="Map details and controls">
+            <p class="slideshow-file">{{ selected_name }}</p>
+            <div class="map-legend">
+                <div class="legend-item"><span class="legend-swatch station"></span>SkyTrain station</div>
+                <div class="legend-item"><span class="legend-swatch bus"></span>Bus stop</div>
+                <div class="legend-item"><span class="legend-swatch wce"></span>WCE stop</div>
+                <div class="legend-item"><span class="legend-swatch seabus"></span>SeaBus terminal</div>
+            </div>
+
+            <div id="slideshowMeta" class="slideshow-meta"></div>
+            <div id="slideshowAction" class="slideshow-action"></div>
+            <div id="slideshowSince" class="slideshow-since"></div>
+            <div id="slideshowWarning" class="slideshow-warning hidden"></div>
+
+            <div class="slideshow-mode-toggle" aria-label="Slideshow mode">
+                <button id="modeOverall" class="sort-btn slideshow-mode-btn active" type="button">Overall Trips</button>
+                <button id="modeTap" class="sort-btn slideshow-mode-btn" type="button">One by One Tap</button>
+            </div>
+            <div class="slideshow-theme-toggle" aria-label="Map theme mode">
+                <button id="themeAuto" class="sort-btn slideshow-mode-btn active" type="button">Auto Light/Dark</button>
+                <button id="themeLightOnly" class="sort-btn slideshow-mode-btn" type="button">Only Light</button>
+            </div>
+
+            <div class="slideshow-calendar-panel" aria-label="Calendar day filter">
+                <p class="slideshow-calendar-title">Filter by Day</p>
+                <div class="slideshow-calendar-nav">
+                    <button id="calendarPrevMonth" type="button" aria-label="Previous month">&lt;</button>
+                    <span id="calendarMonthLabel" class="slideshow-calendar-month"></span>
+                    <button id="calendarNextMonth" type="button" aria-label="Next month">&gt;</button>
+                </div>
+                <div class="slideshow-calendar-weekdays" aria-hidden="true">
+                    <span class="slideshow-calendar-weekday">S</span>
+                    <span class="slideshow-calendar-weekday">M</span>
+                    <span class="slideshow-calendar-weekday">T</span>
+                    <span class="slideshow-calendar-weekday">W</span>
+                    <span class="slideshow-calendar-weekday">T</span>
+                    <span class="slideshow-calendar-weekday">F</span>
+                    <span class="slideshow-calendar-weekday">S</span>
+                </div>
+                <div id="calendarGrid" class="slideshow-calendar-grid"></div>
+                <button id="calendarClearFilter" class="slideshow-calendar-clear" type="button">Show All Days</button>
+                <button id="calendarCustomRange" class="slideshow-calendar-custom" type="button">Select Custom Range</button>
+                <div id="calendarRangeStatus" class="slideshow-calendar-range-status"></div>
+            </div>
+
+            <div class="slideshow-back">
+                <a href="/more" class="button-card button-small">&laquo; Back to More Compass Wrapped</a>
+            </div>
+        </aside>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script id="slideshowData" type="application/json">{{ {'steps': slideshow_steps}|tojson }}</script>
+    <script>
+        window.slideshowData = JSON.parse(document.getElementById("slideshowData").textContent || "{}");
+    </script>
+    <script src="{{ url_for('static', filename='slideshow.js') }}"></script>
+</body>
+</html>

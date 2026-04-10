@@ -118,8 +118,14 @@
 
     <div class="card">
         <h2>Compass Slideshow</h2>
-        <form method="POST" action="/more/upload-slideshow" enctype="multipart/form-data">
-            <input type="file" name="file" accept=".csv" required>
+        <form id="slideshow-upload-form" method="POST" action="/more/upload-slideshow" enctype="multipart/form-data">
+            <div class="file-picker">
+                <input id="slideshow-file-input" class="file-picker-input" type="file" name="file" accept=".csv" required>
+                <label for="slideshow-file-input" class="file-picker-shell" aria-label="Choose slideshow CSV file">
+                    <span class="file-picker-button">Browse...</span>
+                    <span id="slideshow-selected-file" class="file-picker-name is-empty">No file selected.</span>
+                </label>
+            </div>
             <button type="submit">Upload CSV</button>
         </form>
     </div>
@@ -134,6 +140,8 @@
         const multiCsvRemoveBtn = document.getElementById("multi-csv-remove-btn");
         const multiCsvSelected = document.getElementById("multi-csv-selected");
         const multiCsvList = document.getElementById("multi-csv-list");
+        const slideshowFileInput = document.getElementById("slideshow-file-input");
+        const slideshowSelectedFile = document.getElementById("slideshow-selected-file");
 
         let selectedFiles = [];
 
@@ -203,6 +211,13 @@
             });
         }
 
+        function updateSelectedFileName(input, output, emptyText) {
+            if (!input || !output) return;
+            const selectedFile = input.files && input.files.length ? input.files[0] : null;
+            output.textContent = selectedFile ? selectedFile.name : emptyText;
+            output.classList.toggle("is-empty", !selectedFile);
+        }
+
         multiCsvAddBtn.addEventListener("click", () => {
             multiCsvInput.click();
         });
@@ -249,6 +264,13 @@
 
             syncInputFiles();
         });
+
+        if (slideshowFileInput && slideshowSelectedFile) {
+            slideshowFileInput.addEventListener("change", () => {
+                updateSelectedFileName(slideshowFileInput, slideshowSelectedFile, "No file selected.");
+            });
+            updateSelectedFileName(slideshowFileInput, slideshowSelectedFile, "No file selected.");
+        }
 
         renderSelectedFiles();
     </script>

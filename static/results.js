@@ -520,6 +520,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let edgeDeltaX = 0;
     let edgeDeltaY = 0;
     let edgeAxisLock = null;
+    let edgeTouchTracking = false;
+    let edgeTouchStartX = 0;
+    let edgeTouchStartY = 0;
 
     const edgeStartThreshold = 10;
     const edgeSwipeThreshold = 70;
@@ -534,11 +537,17 @@ document.addEventListener('DOMContentLoaded', () => {
       edgeAxisLock = null;
     };
 
+    const isEdgeSwipeExcludedTarget = (target) => {
+      if (!(target instanceof Element)) return false;
+      if (target.closest('.carousel-viewport')) return true;
+      if (target.closest('#section-transit-map, #section-awards')) return true;
+      if (target.closest('button, a, input, select, textarea, label')) return true;
+      return false;
+    };
+
     document.addEventListener('pointerdown', (event) => {
       if (!isPhoneMode() || !isSidebarCollapsed() || !event.isPrimary) return;
-      if (event.target.closest('.carousel-viewport')) return;
-      if (event.target.closest('#section-transit-map, #section-awards')) return;
-      if (event.target.closest('button, a, input, select, textarea, label')) return;
+      if (isEdgeSwipeExcludedTarget(event.target)) return;
 
       edgeTracking = true;
       edgePointerId = event.pointerId;
@@ -581,6 +590,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('pointerup', finishEdgeSwipe, { passive: true });
     document.addEventListener('pointercancel', finishEdgeSwipe, { passive: true });
+
+    document.addEventListener('touchstart', (event) => {
+      if (!isPhoneMode() || !isSidebarCollapsed() || !event.touches.length) {
+        edgeTouchTracking = false;
+        return;
+      }
+      if (isEdgeSwipeExcludedTarget(event.target)) {
+        edgeTouchTracking = false;
+        return;
+      }
+
+      const touch = event.touches[0];
+      edgeTouchStartX = touch.clientX;
+      edgeTouchStartY = touch.clientY;
+      edgeTouchTracking = true;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (event) => {
+      if (!edgeTouchTracking || !event.changedTouches.length) {
+        edgeTouchTracking = false;
+        return;
+      }
+
+      const touch = event.changedTouches[0];
+      const deltaX = touch.clientX - edgeTouchStartX;
+      const deltaY = touch.clientY - edgeTouchStartY;
+      const isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY);
+
+      if (isHorizontalSwipe && deltaX >= edgeSwipeThreshold) {
+        openSidebar();
+      }
+
+      edgeTouchTracking = false;
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', () => {
+      edgeTouchTracking = false;
+    }, { passive: true });
 
     bindSwipeCarousel(resultsSidebar, {
       onSwipeLeft: () => {

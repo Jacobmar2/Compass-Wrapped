@@ -26,7 +26,13 @@
     <div class="card">
         <h2>Upload Your Transit Compass Card CSV</h2>
         <form method="POST" enctype="multipart/form-data" class="home-upload-form">
-            <input type="file" name="file" accept=".csv" required>
+            <div class="file-picker">
+                <input id="homeFileInput" class="file-picker-input" type="file" name="file" accept=".csv" required>
+                <label for="homeFileInput" class="file-picker-shell" aria-label="Choose CSV file">
+                    <span class="file-picker-button">Browse...</span>
+                    <span id="homeSelectedFileName" class="file-picker-name is-empty">No file selected.</span>
+                </label>
+            </div>
             <button type="submit">Upload</button>
         </form>
     </div>
@@ -53,6 +59,25 @@
         </a>
 
     </div>
+
+    <script>
+        const homeFileInput = document.getElementById("homeFileInput");
+        const homeSelectedFileName = document.getElementById("homeSelectedFileName");
+
+        function updateSelectedFileName(input, output, emptyText) {
+            if (!input || !output) return;
+            const selectedFile = input.files && input.files.length ? input.files[0] : null;
+            output.textContent = selectedFile ? selectedFile.name : emptyText;
+            output.classList.toggle("is-empty", !selectedFile);
+        }
+
+        if (homeFileInput && homeSelectedFileName) {
+            homeFileInput.addEventListener("change", () => {
+                updateSelectedFileName(homeFileInput, homeSelectedFileName, "No file selected.");
+            });
+            updateSelectedFileName(homeFileInput, homeSelectedFileName, "No file selected.");
+        }
+    </script>
 
 </body>
 </html>

@@ -502,7 +502,8 @@
                 callbacks: {
                     label(context) {
                         const value = Number(context.raw ?? 0);
-                        return `${context.dataset.label}: ${value}`;
+                        const displayLabel = formatCsvLabelForDisplay(context.dataset.label);
+                        return `${displayLabel}: ${value}`;
                     },
                     footer(items) {
                         if (!items.length) return "";
@@ -530,8 +531,20 @@
         const hourAmBtn = document.getElementById("hourAmBtn");
         const hourPmBtn = document.getElementById("hourPmBtn");
         const isMobileView = window.matchMedia("(max-width: 900px)").matches;
+        const mobileCsvLabelMaxLength = 30;
         const allHourLabels = [...hourLabels];
         const allHourDatasets = hourDatasets.map((dataset) => ({ ...dataset, data: [...dataset.data] }));
+
+        function truncateCsvLabel(label, maxLength = mobileCsvLabelMaxLength) {
+            const text = String(label ?? "");
+            if (text.length <= maxLength) return text;
+            return `${text.slice(0, maxLength - 3)}...`;
+        }
+
+        function formatCsvLabelForDisplay(label) {
+            if (!isMobileView) return String(label ?? "");
+            return truncateCsvLabel(label);
+        }
 
         function clearStationLabelTooltip(chart) {
             chart.setActiveElements([]);
@@ -1007,7 +1020,7 @@
 
             const fileA = compareTapData[aIndex];
             const fileB = compareTapData[bIndex];
-            sharedStationsMapSubtitle.textContent = `Station coverage for CSV A (${fileA.label}) vs CSV B (${fileB.label}).`;
+            sharedStationsMapSubtitle.textContent = `Station coverage for CSV A (${formatCsvLabelForDisplay(fileA.label)}) vs CSV B (${formatCsvLabelForDisplay(fileB.label)}).`;
 
             const visitedA = new Set(Array.isArray(mapFileStationNames[aIndex]) ? mapFileStationNames[aIndex] : []);
             const visitedB = new Set(Array.isArray(mapFileStationNames[bIndex]) ? mapFileStationNames[bIndex] : []);
@@ -1567,7 +1580,7 @@
             const exactPctA = fileATrips ? ((sharedTrips / fileATrips) * 100).toFixed(1) : "0.0";
             const exactPctB = fileBTrips ? ((sharedTrips / fileBTrips) * 100).toFixed(1) : "0.0";
 
-            sharedTripsSummary.textContent = `Shared trips (${latestSharedMatches.length} rows) | CSV A: ${fileA.label} | CSV B: ${fileB.label}`;
+            sharedTripsSummary.textContent = `Shared trips (${latestSharedMatches.length} rows) | CSV A: ${formatCsvLabelForDisplay(fileA.label)} | CSV B: ${formatCsvLabelForDisplay(fileB.label)}`;
 
             sharedTripsBlueCard.style.display = "block";
             renderSharedStationsMap(aIndex, bIndex);
@@ -1670,9 +1683,11 @@
             } else {
                 const [aIndex, bIndex] = selectedCompareIndices;
                 if (aIndex !== undefined && bIndex !== undefined) {
-                    compareSelectionStatus.textContent = `CSV A: ${pieLabels[aIndex]} | CSV B: ${pieLabels[bIndex]}`;
+                    compareSelectionStatus.textContent = `CSV A: ${formatCsvLabelForDisplay(pieLabels[aIndex])} | CSV B: ${formatCsvLabelForDisplay(pieLabels[bIndex])}`;
                 } else {
-                    const names = selectedCompareIndices.map((index) => pieLabels[index]).join(" and ");
+                    const names = selectedCompareIndices
+                        .map((index) => formatCsvLabelForDisplay(pieLabels[index]))
+                        .join(" and ");
                     compareSelectionStatus.textContent = `Selected: ${names}`;
                 }
             }
@@ -1701,7 +1716,8 @@
             button.type = "button";
             button.className = "compare-csv-btn";
             button.dataset.fileIndex = String(index);
-            button.textContent = label;
+            button.textContent = formatCsvLabelForDisplay(label);
+            button.title = String(label ?? "");
             button.addEventListener("click", () => toggleCompareFile(index));
             compareCsvButtonsRoot.appendChild(button);
         });
@@ -1710,7 +1726,7 @@
             compareCsvButtonsRoot.style.display = "none";
             compareResetBtn.style.display = "none";
             selectedCompareIndices.push(0, 1);
-            compareSelectionStatus.textContent = `Auto comparing. CSV A: ${pieLabels[0]} | CSV B: ${pieLabels[1]}`;
+            compareSelectionStatus.textContent = `Auto comparing. CSV A: ${formatCsvLabelForDisplay(pieLabels[0])} | CSV B: ${formatCsvLabelForDisplay(pieLabels[1])}`;
         }
 
         compareResetBtn.addEventListener("click", () => {

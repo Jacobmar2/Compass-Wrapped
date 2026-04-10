@@ -2340,6 +2340,32 @@ def upload_file():
                     "icon": icon
                 })
 
+            skytrainStationPoints = []
+            for station_name in utils.SkyTrainStns:
+                location = utils.get_station_location(station_name)
+                if not location:
+                    continue
+
+                icon = utils.stationIcons.get(station_name, "")
+                line_keys = []
+                if "expmil" in icon:
+                    line_keys = ["expo", "millennium"]
+                elif "expcan" in icon:
+                    line_keys = ["expo", "canada"]
+                elif "millennium" in icon:
+                    line_keys = ["millennium"]
+                elif "canada" in icon:
+                    line_keys = ["canada"]
+                elif "expo" in icon:
+                    line_keys = ["expo"]
+
+                skytrainStationPoints.append({
+                    "name": station_name,
+                    "lat": location["lat"],
+                    "lon": location["lon"],
+                    "line_keys": line_keys,
+                })
+
             topName, topCount = Top5SkyTrainStns[0] if Top5SkyTrainStns else ("N/A", 0)
 
             # 1. Station usage (top/bottom or full list — your choice)
@@ -2564,6 +2590,7 @@ def upload_file():
                 topBusStopMapPoints=topBusStopMapPoints,
                 remainingStationMapPoints=remainingStationMapPoints,
                 remainingBusStopMapPoints=remainingBusStopMapPoints,
+                skytrainStationPoints=skytrainStationPoints,
                 awardsByTier=[
                     {**tier, "awards": sorted(tier["awards"], key=lambda a: not a["earned"])}
                     for tier in awardsByTier

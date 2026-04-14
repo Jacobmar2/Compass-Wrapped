@@ -21,6 +21,15 @@ The goal is to make your ridership patterns visual and shareable, similar to Spo
 
 Made by Jacob Martinez 
 
+## Preview
+
+![Compass Wrapped Summary](static/screenshots%20README/compass-wrapped-summary.png)
+
+![Compass Wrapped Top 5 Stations](static/screenshots%20README/compass-wrapped-top-5-stations.png)
+
+![Compass Wrapped Top Station](static/screenshots%20README/compass-wrapped-top-station.png)
+
+
 ## Notes
 
 ● Each trip is counted by each tap on a bus or each pair of taps on SkyTrain/SeaBus/WCE.
@@ -52,3 +61,42 @@ Made by Jacob Martinez
 - To get a year of ridership data, choose "previous year” for last year`s ridership, or “custom date range” with start date on January 1 of this year, and end date being today 
 
 5. Download CSV from the download button.
+
+## How to Host Locally
+
+1. Clone this repository and move into the project folder.
+
+```bash
+git clone https://github.com/<your-username>/CompassWrapped.git
+cd CompassWrapped
+```
+
+2. Create and activate a virtual environment.
+
+Windows (PowerShell):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+macOS/Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+3. Install dependencies.
+
+```bash
+pip install -r requirements.txt
+```
+
+4. Run the app.
+
+```bash
+python app.py
+```
+
+5. Open your browser at http://127.0.0.1:5000/ and upload your Compass Card CSV.

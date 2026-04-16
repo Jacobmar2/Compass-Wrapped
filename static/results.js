@@ -402,9 +402,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ========== DEEPER STATS TOGGLE ==========
   const topStationPairsSection = $('topStationPairsSection');
+  const skytrainSegmentsSection = $('skytrainSegmentsSection');
   const dayHourCarouselContainer = $('dayHourCarouselContainer');
   const deeperStatsToggle = $('deeperStatsToggle');
   const dayHourCharts = [];
+  let refreshSkytrainSegmentsMap = null;
   let deeperStatsVisible = false;
 
   function refreshDayHourStatsLayout() {
@@ -421,6 +423,10 @@ document.addEventListener('DOMContentLoaded', () => {
         chart.resize();
         chart.update('none');
       });
+
+      if (typeof refreshSkytrainSegmentsMap === 'function') {
+        refreshSkytrainSegmentsMap();
+      }
     });
 
     setTimeout(() => {
@@ -430,6 +436,10 @@ document.addEventListener('DOMContentLoaded', () => {
       dayHourCharts.forEach((chart) => {
         chart.resize();
       });
+
+      if (typeof refreshSkytrainSegmentsMap === 'function') {
+        refreshSkytrainSegmentsMap();
+      }
     }, 80);
   }
 
@@ -438,6 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayValue = isVisible ? '' : 'none';
 
     if (topStationPairsSection) topStationPairsSection.style.display = displayValue;
+    if (skytrainSegmentsSection) skytrainSegmentsSection.style.display = displayValue;
     if (dayHourCarouselContainer) dayHourCarouselContainer.style.display = displayValue;
     if (deeperStatsToggle) deeperStatsToggle.textContent = isVisible ? 'Hide deeper stats' : 'Reveal deeper stats';
 
@@ -1001,6 +1012,243 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch (e) { console.error('top stops map error', e); }
 
   // ========== END TOP STOPS MAP ==========
+
+  // ========== SKYTRAIN SEGMENTS MAP ==========
+  try {
+    const segmentsMapContainer = $('skytrainSegmentsMap');
+    const segmentUsageByName = (data && data.skytrain_segment_usage && typeof data.skytrain_segment_usage === 'object')
+      ? data.skytrain_segment_usage
+      : {};
+
+    const parseLineStringWkt = (wktText) => {
+      const text = String(wktText || '').trim();
+      const match = text.match(/^LINESTRING\s*\((.*)\)$/i);
+      if (!match || !match[1]) return [];
+
+      return match[1]
+        .split(',')
+        .map((pair) => pair.trim().split(/\s+/))
+        .map((parts) => {
+          if (parts.length < 2) return null;
+          const lon = Number(parts[0]);
+          const lat = Number(parts[1]);
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+          return [lat, lon];
+        })
+        .filter(Boolean);
+    };
+
+    const parseSegmentsCsv = (csvText) => {
+      const lines = String(csvText || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+      if (lines.length <= 1) return [];
+
+      return lines.slice(1).map((line) => {
+        const match = line.match(/^"((?:[^"]|"")*)",([^,]*),(.*)$/);
+        if (!match) return null;
+
+        const wkt = match[1].replace(/""/g, '"');
+        const name = String(match[2] || '').trim();
+        return {
+          name,
+          latlngs: parseLineStringWkt(wkt)
+        };
+      }).filter((segment) => segment && segment.latlngs.length >= 2);
+    };
+
+    const haversineDistanceKm = (fromLatLng, toLatLng) => {
+      const [lat1, lon1] = fromLatLng;
+      const [lat2, lon2] = toLatLng;
+      const toRad = (degrees) => (degrees * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const phi1 = toRad(lat1);
+      const phi2 = toRad(lat2);
+      const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const earthRadiusKm = 6371;
+      return earthRadiusKm * c;
+    };
+
+    const polylineLengthKm = (latlngs) => {
+      if (!Array.isArray(latlngs) || latlngs.length < 2) return 0;
+      let totalKm = 0;
+      for (let i = 0; i < latlngs.length - 1; i += 1) {
+        totalKm += haversineDistanceKm(latlngs[i], latlngs[i + 1]);
+      }
+      return totalKm;
+    };
+
+    const updateTotalSkytrainDistance = (distanceKm) => {
+      const totalDistanceEl = $('skytrainTotalDistanceValue');
+      if (!totalDistanceEl) return;
+      totalDistanceEl.textContent = `${distanceKm.toFixed(1)} km`;
+    };
+
+    const clamp01 = (value) => Math.max(0, Math.min(1, value));
+    const lerp = (start, end, t) => start + (end - start) * t;
+    const interpolateRgb = (from, to, t) => [
+      Math.round(lerp(from[0], to[0], t)),
+      Math.round(lerp(from[1], to[1], t)),
+      Math.round(lerp(from[2], to[2], t)),
+    ];
+    const rgbToHex = (rgb) => `#${rgb.map((component) => component.toString(16).padStart(2, '0')).join('')}`;
+
+    const USAGE_COLOR_STOPS = [
+      { position: 0, color: [34, 197, 94] },
+      { position: 0.34, color: [234, 179, 8] },
+      { position: 0.67, color: [249, 115, 22] },
+      { position: 1, color: [220, 38, 38] }
+    ];
+
+    const getGradientColor = (ratio) => {
+      const r = clamp01(ratio);
+      for (let i = 0; i < USAGE_COLOR_STOPS.length - 1; i += 1) {
+        const left = USAGE_COLOR_STOPS[i];
+        const right = USAGE_COLOR_STOPS[i + 1];
+        if (r >= left.position && r <= right.position) {
+          const segmentT = (r - left.position) / (right.position - left.position || 1);
+          return rgbToHex(interpolateRgb(left.color, right.color, segmentT));
+        }
+      }
+      return '#dc2626';
+    };
+
+    const formatUsesLabel = (value) => `${Math.round(value)} uses`;
+
+    const updateSegmentsLegend = (minUsage, maxUsage) => {
+      const minEl = $('skytrainLegendMin');
+      const maxEl = $('skytrainLegendMax');
+      const unusedEl = $('skytrainLegendUnused');
+      if (unusedEl) unusedEl.textContent = 'Unused (0 uses)';
+
+      if (!minEl || !maxEl) return;
+
+      if (maxUsage <= 0) {
+        minEl.textContent = 'No used segments';
+        maxEl.textContent = '';
+        return;
+      }
+
+      if (maxUsage === minUsage) {
+        minEl.textContent = `Used segments (${formatUsesLabel(minUsage)})`;
+        maxEl.textContent = '';
+        return;
+      }
+
+      minEl.textContent = `Least used (${formatUsesLabel(minUsage)})`;
+      maxEl.textContent = `Most used (${formatUsesLabel(maxUsage)})`;
+    };
+
+    if (segmentsMapContainer && window.L) {
+      const segmentsMap = L.map(segmentsMapContainer, {
+        scrollWheelZoom: true,
+      });
+      let segmentBounds = null;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(segmentsMap);
+
+      fetch('/static/data/SkyTrain%20segments%20map-%20segments.csv', {
+        cache: 'no-store'
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`Could not load segments CSV (HTTP ${response.status})`);
+          }
+          return response.text();
+        })
+        .then((csvText) => {
+          const segments = parseSegmentsCsv(csvText);
+          if (!segments.length) return;
+
+          const positiveUseCounts = segments
+            .map((segment) => {
+              const usage = segmentUsageByName[segment.name] || {};
+              const useCount = Number(usage.uses);
+              return Number.isFinite(useCount) && useCount > 0 ? useCount : 0;
+            })
+            .filter((count) => count > 0);
+
+          const minUsage = positiveUseCounts.length ? Math.min(...positiveUseCounts) : 0;
+          const maxUsage = positiveUseCounts.length ? Math.max(...positiveUseCounts) : 0;
+
+          const getColorForUsage = (useCount) => {
+            if (useCount <= 0) return '#9aa4b2';
+            if (maxUsage <= minUsage) return '#dc2626';
+            const ratio = (useCount - minUsage) / (maxUsage - minUsage);
+            return getGradientColor(ratio);
+          };
+
+          updateSegmentsLegend(minUsage, maxUsage);
+
+          const allLatLngs = [];
+          let totalDistanceKm = 0;
+
+          segments.forEach((segment) => {
+            const usage = segmentUsageByName[segment.name] || {};
+            const useCount = Number.isFinite(Number(usage.uses)) ? Number(usage.uses) : 0;
+            const weightedMinutes = Number.isFinite(Number(usage.minutes)) ? Number(usage.minutes) : 0;
+            const color = getColorForUsage(useCount);
+            if (useCount > 0) {
+              totalDistanceKm += polylineLengthKm(segment.latlngs) * useCount;
+            }
+
+            const popupHtml = `<div class="map-popup-title">${segment.name || 'SkyTrain Segment'}</div><div class="map-popup-meta">Uses: ${useCount}<br>Weighted minutes: ${weightedMinutes}</div>`;
+
+            L.polyline(segment.latlngs, {
+              color,
+              weight: 6,
+              opacity: 0.9
+            })
+              .addTo(segmentsMap)
+              .bindPopup(popupHtml);
+
+            allLatLngs.push(...segment.latlngs);
+          });
+
+          updateTotalSkytrainDistance(totalDistanceKm);
+
+          if (allLatLngs.length === 1) {
+            segmentsMap.setView(allLatLngs[0], 13);
+            segmentBounds = L.latLngBounds(allLatLngs);
+          } else if (allLatLngs.length > 1) {
+            segmentBounds = L.latLngBounds(allLatLngs);
+            segmentsMap.fitBounds(segmentBounds, { padding: [36, 36] });
+          }
+
+          requestAnimationFrame(() => {
+            segmentsMap.invalidateSize();
+          });
+
+          window.addEventListener('resize', () => {
+            requestAnimationFrame(() => {
+              segmentsMap.invalidateSize();
+            });
+          });
+
+          refreshSkytrainSegmentsMap = () => {
+            requestAnimationFrame(() => {
+              segmentsMap.invalidateSize();
+              if (segmentBounds && segmentBounds.isValid()) {
+                segmentsMap.fitBounds(segmentBounds, { padding: [36, 36] });
+              }
+            });
+          };
+        })
+        .catch((error) => {
+          console.error('skytrain segments map error', error);
+        });
+    }
+  } catch (e) { console.error('skytrain segments map setup error', e); }
+
+  // ========== END SKYTRAIN SEGMENTS MAP ==========
 
   // ========== STATION CHART SORTING ==========
   let stationChart = null;

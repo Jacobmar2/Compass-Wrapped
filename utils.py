@@ -10,16 +10,29 @@ def printOutList(lst):
     for i, item in enumerate(lst, start=1):
         print(f"{i}. {item}")
 
+
+STATION_NAME_ALIASES = {
+    "Commercial Drive Stn": "Commercial-Broadway Stn",
+    "Commercial Dr Stn": "Commercial-Broadway Stn",
+}
+
+
+def canonicalize_station_name(name):
+    cleaned = (name or "").strip()
+    return STATION_NAME_ALIASES.get(cleaned, cleaned)
+
 def ProcessList(data):
     result = []
     for item in data:
         if "Missing" in item:
-            result.append("(Missing)")
+            processed = "(Missing)"
         elif "at" in item:
             # split only once at the first "at" and take what follows
-            result.append(item.split("at", 1)[1].strip())
+            processed = item.split("at", 1)[1].strip()
         else:
-            result.append(item)
+            processed = item
+
+        result.append(canonicalize_station_name(processed))
     return result
 
 def CountElementsInList(items):    # Each element has a station name and number (representing amount of times used)
@@ -153,7 +166,7 @@ SkyTrainStns = [
     "Burrard Stn",
     "Capstan Stn",
     "Columbia Stn",
-    "Commercial Drive Stn",
+    "Commercial-Broadway Stn",
     "Coquitlam Central Stn",
     "Edmonds Stn",
     "Gateway Stn",
@@ -205,7 +218,7 @@ stationIcons = {
     "Granville Stn": "icons/expo",
     "Stadium Stn": "icons/expo",
     "Main Street Stn": "icons/expo",
-    "Commercial Drive Stn": "icons/expmil",
+    "Commercial-Broadway Stn": "icons/expmil",
     "Nanaimo Stn": "icons/expo",
     "29th Av Stn": "icons/expo",
     "Joyce Stn": "icons/expo",
@@ -276,7 +289,7 @@ stationImages = {
     "Burrard Stn": "https://upload.wikimedia.org/wikipedia/commons/f/f8/Vancouver_-_Burrard_Station_entrance_01.jpg",
     "Capstan Stn": "https://upload.wikimedia.org/wikipedia/commons/8/82/Capstan_Station_Entrance_20241220.jpg",
     "Columbia Stn": "https://upload.wikimedia.org/wikipedia/commons/3/32/Columbia_platform_level.jpg",
-    "Commercial Drive Stn": "https://upload.wikimedia.org/wikipedia/commons/a/a3/Commercial-Broadway_station.jpg",
+    "Commercial-Broadway Stn": "https://upload.wikimedia.org/wikipedia/commons/a/a3/Commercial-Broadway_station.jpg",
     "Coquitlam Central Stn": "https://upload.wikimedia.org/wikipedia/commons/a/a7/Coquitlam_Central_Station_Exterior.jpg",
     "Edmonds Stn": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Edmonds_station%2C_August_2018.jpg",
     "Gateway Stn": "https://upload.wikimedia.org/wikipedia/commons/0/07/Gateway_station%2C_October_2018.jpg",
@@ -327,6 +340,7 @@ stationLocationAliases = {
     "Brentwood Stn": "Brentwood Town Centre Station",
     "Brighouse Stn": "Richmond-Brighouse Station",
     "Commercial Drive Stn": "Commercial-Broadway Station",
+    "Commercial-Broadway Stn": "Commercial-Broadway Station",
     "Lafarge Lake/Douglas College Stn": "Lafarge Lake-Douglas Station",
     "Langara-49th Stn": "Langara-49th Avenue Station",
     "Lougheed Stn": "Lougheed Town Centre Station",

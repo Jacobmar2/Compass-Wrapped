@@ -8,6 +8,7 @@ __pycache__/
 
 # Ignore sensitive CSV files
 *.csv
+!static/data/SkyTrain segments map- segments.csv
 
 # Distribution / packaging
 .Python

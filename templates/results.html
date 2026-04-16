@@ -26,6 +26,7 @@
                 </button>
                 <ul id="sidebarDeeperMenu" class="sidebar-submenu">
                     <li><a href="#topStationPairsSection" class="sidebar-link sidebar-sublink" data-section="topStationPairsSection" data-requires-deeper="true">Station Pairs</a></li>
+                    <li><a href="#skytrainSegmentsSection" class="sidebar-link sidebar-sublink" data-section="skytrainSegmentsSection" data-requires-deeper="true">SkyTrain Segments Map</a></li>
                     <li><a href="#dayHourCarouselContainer" class="sidebar-link sidebar-sublink" data-section="dayHourCarouselContainer" data-requires-deeper="true">Days of the Week Hourly Usage</a></li>
                 </ul>
             </li>
@@ -377,6 +378,27 @@
         <br>
     </div>
 
+    <div class="results-card map-card" id="skytrainSegmentsSection">
+        <h2>SkyTrain Segments Map</h2>
+        <p class="map-subtitle">Segment color reflects usage. Shortest trip is assumed. Unused segments are grey.</p>
+        <div id="skytrainSegmentsMap" class="top-stops-map"></div>
+        <div id="skytrainSegmentsLegend" class="segment-usage-legend" aria-label="SkyTrain segment usage legend">
+            <div class="segment-usage-unused">
+                <span class="segment-usage-unused-swatch" aria-hidden="true"></span>
+                <span id="skytrainLegendUnused">Unused (0 uses)</span>
+            </div>
+            <div id="skytrainLegendGradient" class="segment-usage-gradient" aria-hidden="true"></div>
+            <div class="segment-usage-labels">
+                <span id="skytrainLegendMin">Least used</span>
+                <span id="skytrainLegendMax">Most used</span>
+            </div>
+            <div class="segment-usage-total-distance">
+                <span class="segment-usage-total-label">Total SkyTrain distance traveled:</span>
+                <span id="skytrainTotalDistanceValue">0.0 km</span>
+            </div>
+        </div>
+    </div>
+
     <div class="carousel-container" id="dayHourCarouselContainer">
 
         <div class="carousel-viewport">
@@ -437,7 +459,8 @@
         top_bus_stop_map_points: {{ topBusStopMapPoints|tojson }},
         remaining_station_map_points: {{ remainingStationMapPoints|tojson }},
         remaining_bus_stop_map_points: {{ remainingBusStopMapPoints|tojson }},
-        wce_lonsdale_stations: {{ wceLonsdaleStations|tojson }}
+        wce_lonsdale_stations: {{ wceLonsdaleStations|tojson }},
+        skytrain_segment_usage: {{ skytrainSegmentUsage|tojson }}
     };
     </script>
 

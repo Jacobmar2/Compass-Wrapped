@@ -8,6 +8,7 @@ from collections import Counter, OrderedDict
 from datetime import datetime, timedelta
 import calendar
 import re
+import heapq
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -21,6 +22,351 @@ MAX_CSV_ROWS = 150000
 TIMESTAMP_FORMAT = "%b-%d-%Y %I:%M %p"
 
 WCE_TERMINAL_STATION_KEYS = {"waterfront", "moody center"}
+SEGMENTS_CSV_PATH = os.path.join("static", "data", "SkyTrain segments map- segments.csv")
+
+
+def _normalize_graph_station_name(name):
+    text = str(name or "").strip().lower()
+    text = text.replace("&", " and ")
+    text = text.replace("/", " ")
+    text = text.replace("-", " ")
+    text = text.replace(".", " ")
+    text = re.sub(r"\bstn\b", "station", text)
+    text = re.sub(r"\bstation\b", " ", text)
+    text = re.sub(r"\bst\b", "street", text)
+    text = re.sub(r"\bdr\b", "drive", text)
+    text = re.sub(r"\bav\b", "avenue", text)
+    text = re.sub(r"\bave\b", "avenue", text)
+    text = re.sub(r"\bcentre\b", "center", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+GRAPH_STATION_ALIASES = {
+    # Expo/Millennium
+    "waterfront": "Waterfront",
+    "burrard": "Burrard",
+    "granville": "Granville",
+    "stadium": "Stadium-Chinatown",
+    "stadium chinatown": "Stadium-Chinatown",
+    "main street science world": "Main Street-Science World",
+    "science world": "Main Street-Science World",
+    "main street": "Main Street-Science World",
+    "commercial broadway": "Commercial-Broadway",
+    "commercial": "Commercial-Broadway",
+    "commercial drive": "Commercial-Broadway",
+    "commercial dr": "Commercial-Broadway",
+    "nanaimo": "Nanaimo",
+    "29th": "29th Avenue",
+    "29th av": "29th Avenue",
+    "29th avenue": "29th Avenue",
+    "joyce": "Joyce-Collingwood",
+    "joyce collingwood": "Joyce-Collingwood",
+    "patterson": "Patterson",
+    "metrotown": "Metrotown",
+    "royal oak": "Royal Oak",
+    "edmonds": "Edmonds",
+    "22nd": "22nd Street",
+    "22nd st": "22nd Street",
+    "22nd street": "22nd Street",
+    "new west": "New Westminster",
+    "new westminster": "New Westminster",
+    "columbia": "Columbia",
+    "scott rd": "Scott Road",
+    "scott road": "Scott Road",
+    "gateway": "Gateway",
+    "surrey central": "Surrey Central",
+    "king george": "King George",
+    "sapperton": "Sapperton",
+    "braid": "Braid",
+    "lougheed": "Lougheed Town Centre",
+    "lougheed town centre": "Lougheed Town Centre",
+    "production": "Production Way-University",
+    "production way": "Production Way-University",
+    "production way university": "Production Way-University",
+    "vcc clark": "VCC-Clark",
+    "renfrew": "Renfrew",
+    "rupert": "Rupert",
+    "gilmore": "Gilmore",
+    "brentwood": "Brentwood",
+    "holdom": "Holdom",
+    "sperling": "Sperling-Burnaby Lake",
+    "sperling burnaby lake": "Sperling-Burnaby Lake",
+    "lake city": "Lake City Way",
+    "lake city way": "Lake City Way",
+    "burquitlam": "Burquitlam",
+    "moody": "Moody Centre",
+    "moody center": "Moody Centre",
+    "moody centre": "Moody Centre",
+    "inlet": "Inlet Centre",
+    "inlet center": "Inlet Centre",
+    "inlet centre": "Inlet Centre",
+    "coquitlam": "Coquitlam Central",
+    "coquitlam central": "Coquitlam Central",
+    "lincoln": "Lincoln",
+    "lafarge": "Lafarge Lake-Douglas",
+    "lafarge lake douglas": "Lafarge Lake-Douglas",
+    "lafarge lake douglas college": "Lafarge Lake-Douglas",
+    # Canada
+    "vancouver city centre": "Vancouver City Centre",
+    "vancouver city center": "Vancouver City Centre",
+    "city center": "Vancouver City Centre",
+    "city centre": "Vancouver City Centre",
+    "yaletown": "Yaletown-Roundhouse",
+    "yaletown roundhouse": "Yaletown-Roundhouse",
+    "olympic": "Olympic Village",
+    "olympic village": "Olympic Village",
+    "broadway": "Broadway-City Hall",
+    "broadway city hall": "Broadway-City Hall",
+    "king edward": "King Edward",
+    "oakridge": "Oakridge-41st Avenue",
+    "oakridge 41st": "Oakridge-41st Avenue",
+    "oakridge 41st avenue": "Oakridge-41st Avenue",
+    "langara": "Langara-49th Avenue",
+    "langara 49th": "Langara-49th Avenue",
+    "langara 49th avenue": "Langara-49th Avenue",
+    "marine": "Marine Drive",
+    "marine drive": "Marine Drive",
+    "bridgeport": "Bridgeport",
+    "capstan": "Capstan",
+    "aberdeen": "Aberdeen",
+    "lansdowne": "Lansdowne",
+    "brighouse": "Richmond-Brighouse",
+    "richmond": "Richmond-Brighouse",
+    "richmond brighouse": "Richmond-Brighouse",
+    "templeton": "Templeton",
+    "sea island": "Sea Island Centre",
+    "sea island centre": "Sea Island Centre",
+    "yvr": "YVR-Airport",
+    "yvr airport": "YVR-Airport",
+    # SeaBus bridge for pair counting
+    "lonsdale": "Waterfront",
+    "lonsdale quay": "Waterfront",
+    "lonsdale quay northbound": "Waterfront",
+    "lonsdale quay southbound": "Waterfront",
+}
+
+
+def canonical_graph_station_name(name):
+    normalized = _normalize_graph_station_name(name)
+    if not normalized:
+        return ""
+    return GRAPH_STATION_ALIASES.get(normalized, "")
+
+
+def _add_edge(graph, station_a, station_b, minutes):
+    graph.setdefault(station_a, {})
+    graph.setdefault(station_b, {})
+    existing = graph[station_a].get(station_b)
+    if existing is None or minutes < existing:
+        graph[station_a][station_b] = minutes
+        graph[station_b][station_a] = minutes
+
+
+def build_skytrain_graph():
+    graph = {}
+
+    # Expo line: Waterfront -> King George branch
+    expo_main = [
+        "Waterfront", "Burrard", "Granville", "Stadium-Chinatown", "Main Street-Science World",
+        "Commercial-Broadway", "Nanaimo", "29th Avenue", "Joyce-Collingwood", "Patterson",
+        "Metrotown", "Royal Oak", "Edmonds", "22nd Street", "New Westminster", "Columbia",
+        "Scott Road", "Gateway", "Surrey Central", "King George",
+    ]
+    expo_main_times = [2, 1, 2, 2, 3, 3, 1, 2, 2, 2, 1, 3, 3, 3, 1, 3, 3, 2, 1]
+
+    # Expo line: Columbia -> Production Way branch
+    expo_branch = ["Columbia", "Sapperton", "Braid", "Lougheed Town Centre", "Production Way-University"]
+    expo_branch_times = [3, 2, 3, 2]
+
+    # Millennium line
+    millennium = [
+        "VCC-Clark", "Commercial-Broadway", "Renfrew", "Rupert", "Gilmore", "Brentwood", "Holdom",
+        "Sperling-Burnaby Lake", "Lake City Way", "Production Way-University", "Lougheed Town Centre",
+        "Burquitlam", "Moody Centre", "Inlet Centre", "Coquitlam Central", "Lincoln", "Lafarge Lake-Douglas",
+    ]
+    millennium_times = [1, 3, 1, 2, 2, 2, 2, 3, 2, 2, 3, 5, 2, 3, 2, 1]
+
+    # Canada line trunk and branches
+    canada_trunk = [
+        "Waterfront", "Vancouver City Centre", "Yaletown-Roundhouse", "Olympic Village",
+        "Broadway-City Hall", "King Edward", "Oakridge-41st Avenue", "Langara-49th Avenue",
+        "Marine Drive", "Bridgeport",
+    ]
+    canada_trunk_times = [2, 2, 2, 1, 2, 3, 2, 3, 3]
+
+    canada_richmond = ["Bridgeport", "Capstan", "Aberdeen", "Lansdowne", "Richmond-Brighouse"]
+    canada_richmond_times = [1, 2, 2, 1]
+
+    canada_yvr = ["Bridgeport", "Templeton", "Sea Island Centre", "YVR-Airport"]
+    canada_yvr_times = [2, 2, 3]
+
+    for i, minutes in enumerate(expo_main_times):
+        _add_edge(graph, expo_main[i], expo_main[i + 1], minutes)
+    for i, minutes in enumerate(expo_branch_times):
+        _add_edge(graph, expo_branch[i], expo_branch[i + 1], minutes)
+    for i, minutes in enumerate(millennium_times):
+        _add_edge(graph, millennium[i], millennium[i + 1], minutes)
+    for i, minutes in enumerate(canada_trunk_times):
+        _add_edge(graph, canada_trunk[i], canada_trunk[i + 1], minutes)
+    for i, minutes in enumerate(canada_richmond_times):
+        _add_edge(graph, canada_richmond[i], canada_richmond[i + 1], minutes)
+    for i, minutes in enumerate(canada_yvr_times):
+        _add_edge(graph, canada_yvr[i], canada_yvr[i + 1], minutes)
+
+    return graph
+
+
+def shortest_path_with_minutes(graph, start_station, end_station):
+    if start_station not in graph or end_station not in graph:
+        return None, []
+    if start_station == end_station:
+        return 0, [start_station]
+
+    queue = [(0, start_station, [start_station])]
+    best_minutes = {}
+
+    while queue:
+        total_minutes, current_station, path = heapq.heappop(queue)
+
+        if current_station in best_minutes and total_minutes >= best_minutes[current_station]:
+            continue
+        best_minutes[current_station] = total_minutes
+
+        if current_station == end_station:
+            return total_minutes, path
+
+        for neighbor, edge_minutes in graph[current_station].items():
+            heapq.heappush(
+                queue,
+                (total_minutes + edge_minutes, neighbor, path + [neighbor]),
+            )
+
+    return None, []
+
+
+def all_skytrain_station_pair_counts(file_path):
+    rows = None
+    for encoding in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+        try:
+            with open(file_path, newline="", encoding=encoding) as csvfile:
+                rows = list(csv.reader(csvfile))[1:]
+            break
+        except UnicodeDecodeError:
+            continue
+
+    if rows is None:
+        with open(file_path, newline="", encoding="utf-8", errors="replace") as csvfile:
+            rows = list(csv.reader(csvfile))[1:]
+
+    pair_counts = Counter()
+    for i in range(0, len(rows) - 1):
+        row = rows[i]
+        next_row = rows[i + 1]
+        if len(row) < 2 or len(next_row) < 2:
+            continue
+
+        action = str(row[1]).strip()
+        next_action = str(next_row[1]).strip()
+        lowered = action.lower()
+        next_lowered = next_action.lower()
+
+        if not action or not next_action:
+            continue
+        if "out" not in lowered:
+            continue
+        if "missing" in lowered or "missing" in next_lowered:
+            continue
+
+        first_name, second_name = utils.ProcessList([action, next_action])
+        first_station = canonical_graph_station_name(first_name)
+        second_station = canonical_graph_station_name(second_name)
+
+        if not first_station or not second_station or first_station == second_station:
+            continue
+
+        pair_key = tuple(sorted((first_station, second_station)))
+        pair_counts[pair_key] += 1
+
+    return pair_counts
+
+
+def build_segment_usage_from_pairs(pair_counts):
+    graph = build_skytrain_graph()
+    segment_uses = Counter()
+    segment_minutes = Counter()
+    shortest_pair_minutes = {}
+
+    for pair_key, uses in pair_counts.items():
+        start_station, end_station = pair_key
+        total_minutes, path = shortest_path_with_minutes(graph, start_station, end_station)
+        if total_minutes is None or len(path) < 2:
+            continue
+
+        shortest_pair_minutes[f"{start_station}__{end_station}"] = {
+            "minutes": total_minutes,
+            "uses": int(uses),
+        }
+
+        for i in range(len(path) - 1):
+            left = path[i]
+            right = path[i + 1]
+            edge_key = tuple(sorted((left, right)))
+            edge_minutes = graph[left][right]
+            segment_uses[edge_key] += uses
+            segment_minutes[edge_key] += uses * edge_minutes
+
+    return segment_uses, segment_minutes, shortest_pair_minutes
+
+
+def split_segment_name_to_stations(segment_name):
+    tokens = str(segment_name or "").strip().split()
+    if len(tokens) < 2:
+        return "", ""
+
+    for split_index in range(1, len(tokens)):
+        left_text = " ".join(tokens[:split_index])
+        right_text = " ".join(tokens[split_index:])
+        left_station = canonical_graph_station_name(left_text)
+        right_station = canonical_graph_station_name(right_text)
+        if left_station and right_station and left_station != right_station:
+            return left_station, right_station
+
+    return "", ""
+
+
+def build_segment_usage_by_csv_name(segment_uses, segment_minutes):
+    usage_by_name = {}
+
+    if not os.path.exists(SEGMENTS_CSV_PATH):
+        return usage_by_name
+
+    with open(SEGMENTS_CSV_PATH, newline="", encoding="utf-8") as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            segment_name = str(row.get("name", "")).strip()
+            if not segment_name:
+                continue
+
+            left_station, right_station = split_segment_name_to_stations(segment_name)
+            if not left_station or not right_station:
+                usage_by_name[segment_name] = {
+                    "uses": 0,
+                    "minutes": 0,
+                    "from": "",
+                    "to": "",
+                }
+                continue
+
+            edge_key = tuple(sorted((left_station, right_station)))
+            usage_by_name[segment_name] = {
+                "uses": int(segment_uses.get(edge_key, 0)),
+                "minutes": int(segment_minutes.get(edge_key, 0)),
+                "from": left_station,
+                "to": right_station,
+            }
+
+    return usage_by_name
 
 
 def format_last_used_for_display(last_used_dt):
@@ -718,6 +1064,8 @@ def normalize_station_key(action_text):
     station = station.replace(" Station", "")
     station = station.replace(" Stn", "")
     station = re.sub(r"\s+", " ", station).strip().lower()
+    if station == "commercial drive":
+        return "commercial broadway"
     return station
 
 
@@ -1340,6 +1688,24 @@ def more_upload_slideshow():
 
 SLIDESHOW_EXCLUDED_KEYWORDS = ("loaded", "sv", "cos", "purchase")
 
+SLIDESHOW_FIXED_LOCATIONS = {
+    "lonsdale quay": {
+        "name": "Lonsdale Quay",
+        "lat": 49.310161,
+        "lon": -123.083358,
+    },
+    "lonsdale quay northbound": {
+        "name": "Lonsdale Quay",
+        "lat": 49.310161,
+        "lon": -123.083358,
+    },
+    "lonsdale quay southbound": {
+        "name": "Lonsdale Quay",
+        "lat": 49.310161,
+        "lon": -123.083358,
+    },
+}
+
 
 def should_exclude_slideshow_action(action_text):
     lowered = str(action_text).lower()
@@ -1402,6 +1768,16 @@ def resolve_slideshow_location(action_text):
     clean_name = tap_name.replace("(Missing)", "").strip() if tap_name else ""
     if not clean_name:
         clean_name = "Unknown"
+
+    fixed_location = SLIDESHOW_FIXED_LOCATIONS.get(clean_name.lower())
+    if fixed_location:
+        return {
+            "display_name": fixed_location["name"],
+            "warning": "",
+            "location": fixed_location,
+            "marker_type": marker_type,
+        }
+
     location = utils.get_station_location(clean_name)
     if location:
         return {
@@ -1562,6 +1938,8 @@ def upload_file():
                     processed_name = "(Missing)"
                 elif "at" in action:
                     processed_name = action.split("at", 1)[1].strip()
+
+                processed_name = utils.canonicalize_station_name(processed_name)
 
                 entry_dt = entry["timestamp"]
                 if not entry_dt:
@@ -2097,6 +2475,10 @@ def upload_file():
 
             Top10StationPairs = top_station_pairs(fileName, top_n=10)
 
+            allSkytrainPairCounts = all_skytrain_station_pair_counts(fileName)
+            segmentUses, segmentMinutes, shortestPairMinutes = build_segment_usage_from_pairs(allSkytrainPairCounts)
+            skytrainSegmentUsage = build_segment_usage_by_csv_name(segmentUses, segmentMinutes)
+
             UsageDict = dict(SkyTrainStns)
 
             UnusedStations = [stn for stn in utils.SkyTrainStns if UsageDict.get(stn, 0) == 0]
@@ -2586,6 +2968,8 @@ def upload_file():
                 minutes=int(minutes),
                 top10BusStops=Top10BusStopsWithNames,
                 top10StationPairs=Top10StationPairs,
+                skytrainSegmentUsage=skytrainSegmentUsage,
+                shortestPairMinutes=shortestPairMinutes,
                 topStationMapPoints=topStationMapPoints,
                 topBusStopMapPoints=topBusStopMapPoints,
                 remainingStationMapPoints=remainingStationMapPoints,

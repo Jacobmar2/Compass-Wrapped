@@ -674,6 +674,54 @@ html {
     transition: height 0.35s ease;
 }
 
+.balance-history-card {
+    color: #173042;
+    text-align: center;
+    padding: 14px 16px 16px;
+}
+
+.balance-history-card h2 {
+    color: #173042;
+}
+
+.balance-history-subtitle {
+    margin: -2px 0 14px;
+    color: #4a6578;
+    font-size: 1rem;
+}
+
+.balance-day-detail {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(23, 48, 66, 0.18);
+}
+
+.balance-day-detail-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    margin-bottom: 8px;
+}
+
+.balance-day-detail-title {
+    margin: 2px 0;
+    color: #173042;
+    font-size: 1rem;
+    text-align: left;
+}
+
+.balance-day-detail-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.balance-day-detail-controls .sort-btn {
+    margin: 0;
+}
+
 .carousel-viewport {
     overflow: hidden;
     border-radius: 12px;

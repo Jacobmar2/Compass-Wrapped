@@ -19,6 +19,7 @@
             <li><a href="#section-bus-stops" class="sidebar-link" data-section="section-bus-stops">Bus Stops</a></li>
             <li><a href="#section-transit-map" class="sidebar-link" data-section="section-transit-map">Transit Map</a></li>
             <li><a href="#section-awards" class="sidebar-link" data-section="section-awards">Awards</a></li>
+            <li><a href="#section-balance-history" class="sidebar-link" data-section="section-balance-history">Balance History</a></li>
 
             <li class="sidebar-group">
                 <button id="sidebarDeeperToggle" class="sidebar-group-toggle" type="button">
@@ -354,6 +355,39 @@
         {% endfor %}
     </div>
 
+    <div class="carousel-container balance-history-card" id="section-balance-history">
+        <h2>Compass Card Balance History</h2>
+        {% if balance_values %}
+        <p class="balance-history-subtitle">
+            Trend by
+            {% if balance_granularity == 'week' %}
+                week
+            {% else %}
+                month
+            {% endif %}
+            across your uploaded CSV date range.
+        </p>
+        <div class="chart-wrapper compact-chart" style="height: 420px;">
+            <canvas id="balanceChart"></canvas>
+        </div>
+        <div id="balanceDayDetail" class="balance-day-detail" style="display: none;">
+            <div class="balance-day-detail-header">
+                <h3 id="balanceDayDetailTitle" class="balance-day-detail-title"></h3>
+                <div class="balance-day-detail-controls">
+                    <button id="balanceDayPrev" class="sort-btn" type="button">Previous day</button>
+                    <button id="balanceDayNext" class="sort-btn" type="button">Next day</button>
+                    <button id="balanceDayClose" class="sort-btn" type="button">Close</button>
+                </div>
+            </div>
+            <div class="chart-wrapper compact-chart" style="height: 340px;">
+                <canvas id="balanceDayChart"></canvas>
+            </div>
+        </div>
+        {% else %}
+        <p>No balance history found in BalanceDetails for this CSV.</p>
+        {% endif %}
+    </div>
+
     <button id="deeperStatsToggle" class="sort-btn deeper-stats-toggle" onclick="toggleDeeperStats()">
         Reveal deeper stats
     </button>
@@ -451,6 +485,15 @@
         day_hour_values: {{ day_hour_values|tojson }},
         month: {{ month|tojson }},
         month_values: {{ month_values|tojson }},
+        balance_labels: {{ balance_labels|tojson }},
+        balance_values: {{ balance_values|tojson }},
+        balance_granularity: {{ balance_granularity|tojson }},
+        balance_change_labels: {{ balance_change_labels|tojson }},
+        balance_change_values: {{ balance_change_values|tojson }},
+        balance_timeline_start: {{ balance_timeline_start|tojson }},
+        balance_timeline_days: {{ balance_timeline_days|tojson }},
+        balance_change_points: {{ balance_change_points|tojson }},
+        balance_intraday_days: {{ balance_intraday_days|tojson }},
         ssw_counts: [{{ SSWtripsNum }}, {{ TripsNum - SSWtripsNum }}],
         ssw_counts_labels: ['SSW','Bus Only'],
         ssw_breakdown: [{{ SkytrainTripsNum }}, {{ SeabusTripsNum }}, {{ WCETripsNum }}],

@@ -1659,6 +1659,376 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch (e) { console.error('month chart error', e); }
 
   try {
+    const balanceCanvas = $('balanceChart');
+    const balanceLabels = Array.isArray(data.balance_labels) ? data.balance_labels : [];
+    const balanceValues = Array.isArray(data.balance_values) ? data.balance_values : [];
+    const balanceGranularity = data.balance_granularity === 'week' ? 'week' : 'month';
+    const balanceTimelineStart = typeof data.balance_timeline_start === 'string' ? data.balance_timeline_start : '';
+    const balanceTimelineDays = Number(data.balance_timeline_days) || 0;
+    const balanceChangePoints = Array.isArray(data.balance_change_points) ? data.balance_change_points : [];
+    const balanceIntradayDays = Array.isArray(data.balance_intraday_days) ? data.balance_intraday_days : [];
+
+    if (balanceCanvas && balanceLabels.length && balanceValues.length) {
+      const chartFontSize = getBarChartFontSize();
+      const startDate = balanceTimelineStart ? new Date(`${balanceTimelineStart}T00:00:00`) : null;
+      const hasValidStartDate = startDate instanceof Date && !Number.isNaN(startDate.getTime());
+      const dayDetailContainer = $('balanceDayDetail');
+      const dayDetailTitle = $('balanceDayDetailTitle');
+      const dayDetailCanvas = $('balanceDayChart');
+      const dayPrevButton = $('balanceDayPrev');
+      const dayNextButton = $('balanceDayNext');
+      const dayCloseButton = $('balanceDayClose');
+      let balanceChartInstance = null;
+      let pendingDayDetail = null;
+      let dayDetailChart = null;
+
+      const intradayByDayIndex = new Map();
+      balanceIntradayDays.forEach((entry) => {
+        const dayIndex = Number(entry?.day_index);
+        if (!Number.isFinite(dayIndex)) return;
+        intradayByDayIndex.set(dayIndex, entry);
+      });
+
+      const selectableDayIndices = [...intradayByDayIndex.values()]
+        .filter((entry) => Number(entry?.change_count || 0) > 1)
+        .map((entry) => Number(entry.day_index))
+        .filter((index) => Number.isFinite(index))
+        .sort((a, b) => a - b);
+
+      let selectedDayNavIndex = -1;
+
+      const updateDayNavButtons = () => {
+        if (!dayPrevButton || !dayNextButton) return;
+        dayPrevButton.disabled = selectedDayNavIndex <= 0;
+        dayNextButton.disabled = selectedDayNavIndex < 0 || selectedDayNavIndex >= selectableDayIndices.length - 1;
+      };
+
+      const renderDayDetail = (dayDetail) => {
+        if (!dayDetail || !dayDetailCanvas || !dayDetailContainer || !dayDetailTitle) return;
+
+        const points = Array.isArray(dayDetail.points) ? dayDetail.points : [];
+        if (!points.length) return;
+
+        // Make the container visible before creating the chart so first render gets real dimensions.
+        dayDetailContainer.style.display = 'block';
+
+        const detailPoints = points
+          .map((point) => ({
+            x: Number(point.hour_value),
+            y: Number(point.balance),
+            timestamp: point.timestamp || '',
+            action: point.action || ''
+          }))
+          .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+
+        if (!detailPoints.length) return;
+
+        const minHour = Math.max(0, Math.floor(Math.min(...detailPoints.map((point) => point.x))));
+        const maxHour = Math.min(24, Math.ceil(Math.max(...detailPoints.map((point) => point.x))));
+        const axisMax = maxHour <= minHour ? Math.min(24, minHour + 1) : maxHour;
+
+        const formatHourTick = (hourValue) => {
+          if (!Number.isFinite(hourValue)) return '';
+          const normalized = ((Math.floor(hourValue) % 24) + 24) % 24;
+          return formatHourLabel(normalized, true);
+        };
+
+        if (dayDetailChart) {
+          dayDetailChart.destroy();
+        }
+
+        dayDetailChart = new Chart(dayDetailCanvas.getContext('2d'), {
+          type: 'line',
+          data: {
+            datasets: [{
+              label: 'Balance through day',
+              data: detailPoints,
+              borderColor: '#0f6ca8',
+              backgroundColor: 'rgba(15, 108, 168, 0.15)',
+              borderWidth: 2,
+              pointRadius: 2.5,
+              pointHoverRadius: 4,
+              stepped: true,
+              tension: 0,
+              fill: false
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title: (items) => {
+                    if (!items || !items.length) return '';
+                    return items[0]?.raw?.timestamp || '';
+                  },
+                  label: (context) => {
+                    const value = Number(context.parsed.y);
+                    const action = context.raw?.action || '';
+                    const balanceText = Number.isFinite(value) ? `$${value.toFixed(2)}` : 'N/A';
+                    return action ? `${balanceText} - ${action}` : balanceText;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                type: 'linear',
+                min: minHour,
+                max: axisMax,
+                ticks: {
+                  stepSize: 1,
+                  callback: (value) => formatHourTick(Number(value)),
+                  font: { size: chartFontSize }
+                },
+                grid: {
+                  color: 'rgba(23, 48, 66, 0.16)'
+                }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  font: { size: chartFontSize },
+                  callback: (value) => `$${Number(value).toFixed(2)}`
+                },
+                grid: {
+                  color: 'rgba(23, 48, 66, 0.12)'
+                }
+              }
+            }
+          }
+        });
+
+        requestAnimationFrame(() => {
+          if (dayDetailChart) {
+            dayDetailChart.resize();
+            dayDetailChart.update('none');
+          }
+        });
+
+        dayDetailTitle.textContent = `Full day balance - ${dayDetail.display_date || dayDetail.date || ''}`;
+
+        if (balanceChartInstance) {
+          const activeX = Number(dayDetail.day_index);
+          const closest = changePoints.find((point) => Math.round(point.x) === Math.round(activeX));
+          if (closest) {
+            const datasetIndex = 1;
+            const pointIndex = changePoints.indexOf(closest);
+            if (pointIndex >= 0) {
+              const element = balanceChartInstance.getDatasetMeta(datasetIndex)?.data?.[pointIndex];
+              if (element && balanceChartInstance.tooltip) {
+                const active = [{ datasetIndex, index: pointIndex }];
+                const position = element.tooltipPosition();
+                balanceChartInstance.setActiveElements(active);
+                balanceChartInstance.tooltip.setActiveElements(active, position);
+                balanceChartInstance.update('none');
+              }
+            }
+          }
+        }
+      };
+
+      const openDayDetailByIndex = (dayIndex) => {
+        const navIndex = selectableDayIndices.findIndex((value) => value === dayIndex);
+        if (navIndex === -1) return;
+
+        selectedDayNavIndex = navIndex;
+        const dayDetail = intradayByDayIndex.get(dayIndex);
+        pendingDayDetail = dayDetail || null;
+        updateDayNavButtons();
+
+        if (dayDetail) {
+          renderDayDetail(dayDetail);
+        }
+      };
+
+      if (dayPrevButton) {
+        dayPrevButton.addEventListener('click', () => {
+          if (selectedDayNavIndex <= 0) return;
+          const nextNavIndex = selectedDayNavIndex - 1;
+          openDayDetailByIndex(selectableDayIndices[nextNavIndex]);
+        });
+      }
+
+      if (dayNextButton) {
+        dayNextButton.addEventListener('click', () => {
+          if (selectedDayNavIndex < 0 || selectedDayNavIndex >= selectableDayIndices.length - 1) return;
+          const nextNavIndex = selectedDayNavIndex + 1;
+          openDayDetailByIndex(selectableDayIndices[nextNavIndex]);
+        });
+      }
+
+      if (dayCloseButton) {
+        dayCloseButton.addEventListener('click', () => {
+          if (dayDetailContainer) dayDetailContainer.style.display = 'none';
+          selectedDayNavIndex = -1;
+          pendingDayDetail = null;
+          updateDayNavButtons();
+        });
+      }
+
+      updateDayNavButtons();
+
+      const changePoints = balanceChangePoints
+        .map((point) => ({
+          x: Number(point.x),
+          y: Number(point.y),
+          date: point.date || ''
+        }))
+        .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+
+      const formatTimelineLabel = (dayIndex) => {
+        if (!hasValidStartDate || !Number.isFinite(dayIndex)) return '';
+        const date = new Date(startDate.getTime());
+        date.setDate(startDate.getDate() + dayIndex);
+
+        if (balanceGranularity === 'week') {
+          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        return date.toLocaleDateString('en-US', { month: 'short' });
+      };
+
+      const buildAxisTickValues = () => {
+        if (!hasValidStartDate || balanceTimelineDays <= 0) return [];
+
+        const values = [];
+        if (balanceGranularity === 'week') {
+          for (let dayIndex = 0; dayIndex < balanceTimelineDays; dayIndex += 7) {
+            values.push(dayIndex);
+          }
+        } else {
+          const seen = new Set();
+          for (let dayIndex = 0; dayIndex < balanceTimelineDays; dayIndex += 1) {
+            const date = new Date(startDate.getTime());
+            date.setDate(startDate.getDate() + dayIndex);
+            const key = `${date.getFullYear()}-${date.getMonth()}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              values.push(dayIndex);
+            }
+          }
+        }
+
+        const lastIndex = balanceTimelineDays - 1;
+        if (lastIndex >= 0 && !values.includes(lastIndex)) {
+          values.push(lastIndex);
+        }
+
+        return values;
+      };
+
+      balanceChartInstance = new Chart(balanceCanvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          datasets: [{
+            label: `Balance by ${balanceGranularity}`,
+            data: balanceChangePoints.map((point) => ({ x: Number(point.x), y: Number(point.y) })).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+            borderColor: '#009cde',
+            backgroundColor: '#009cde',
+            borderWidth: 3,
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            stepped: true,
+            tension: 0,
+            fill: false,
+            spanGaps: true
+          }, {
+            label: 'Balance changes',
+            data: changePoints,
+            showLine: false,
+            borderColor: '#009cde',
+            backgroundColor: '#009cde',
+            pointRadius: 3,
+            pointHoverRadius: 5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          parsing: false,
+          interaction: {
+            mode: 'nearest',
+            intersect: true
+          },
+          onClick: (_event, activeElements, chart) => {
+            if (!activeElements || !activeElements.length) return;
+            const active = activeElements[0];
+            const dataset = chart?.data?.datasets?.[active.datasetIndex];
+            const point = dataset?.data?.[active.index];
+            const xValue = Number(point?.x);
+            if (!Number.isFinite(xValue)) return;
+
+            const dayIndex = Math.round(xValue);
+            const dayDetail = intradayByDayIndex.get(dayIndex);
+            const changeCount = Number(dayDetail?.change_count || 0);
+
+            if (!dayDetail || changeCount <= 1) return;
+
+            openDayDetailByIndex(dayIndex);
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: true,
+              callbacks: {
+                title: (items) => {
+                  if (!items || !items.length) return '';
+                  const first = items[0];
+                  const rawDateLabel = first.raw && typeof first.raw.date === 'string' ? first.raw.date : '';
+                  if (rawDateLabel) return rawDateLabel;
+
+                  const xValue = Number(first.parsed?.x);
+                  if (!Number.isFinite(xValue) || !hasValidStartDate) return '';
+
+                  const pointDate = new Date(startDate.getTime() + (xValue * 24 * 60 * 60 * 1000));
+                  return pointDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                },
+                label: (context) => {
+                  const value = Number(context.parsed.y);
+                  if (!Number.isFinite(value)) return 'Balance: N/A';
+                  const pointDate = Number.isFinite(Number(context.parsed.x)) && hasValidStartDate
+                    ? new Date(startDate.getTime() + (Number(context.parsed.x) * 24 * 60 * 60 * 1000))
+                    : null;
+                  const rawDateLabel = context.raw && typeof context.raw.date === 'string' ? context.raw.date : '';
+                  const computedDateLabel = pointDate
+                    ? pointDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+                    : '';
+                  const dateLabel = rawDateLabel || computedDateLabel;
+                  return dateLabel ? `${dateLabel}: $${value.toFixed(2)}` : `Balance: $${value.toFixed(2)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              min: 0,
+              max: balanceTimelineDays > 0 ? balanceTimelineDays - 1 : undefined,
+              ticks: {
+                values: buildAxisTickValues(),
+                callback: (value) => formatTimelineLabel(Number(value)),
+                font: { size: chartFontSize },
+                maxRotation: 0,
+                minRotation: 0
+              }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                font: { size: chartFontSize },
+                callback: (value) => `$${Number(value).toFixed(2)}`
+              }
+            }
+          }
+        }
+      });
+    }
+  } catch (e) { console.error('balance chart error', e); }
+
+  try {
     const weekdayNames = data.weekday_full_names || [];
     const dayHourValues = data.day_hour_values || [];
     const hourLabels = data.hours || Array.from({ length: 24 }, (_, i) => i);

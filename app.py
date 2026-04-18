@@ -1389,6 +1389,309 @@ def validate_compass_csv(file_path):
     return True, None
 
 
+def parse_balance_amount(balance_text):
+    text = str(balance_text or "").strip()
+    if not text:
+        return None
+
+    # Compass exports can include extra text; use the last money-like number as balance.
+    matches = re.findall(r"-?\$?\s*\d+(?:,\d{3})*(?:\.\d+)?", text)
+    if not matches:
+        return None
+
+    candidate = matches[-1].replace("$", "").replace(",", "").strip()
+    try:
+        return float(candidate)
+    except ValueError:
+        return None
+
+
+def is_station_pair_tap(action_text):
+    action = str(action_text or "").strip()
+    lowered = action.lower()
+
+    if not lowered.startswith("tap in at"):
+        return False
+    if "bus stop" in lowered:
+        return False
+    if "loaded" in lowered or "purchase" in lowered or "refund" in lowered:
+        return False
+    return True
+
+
+def is_station_pair_settlement(action_text):
+    action = str(action_text or "").strip().lower()
+    if "bus stop" in action:
+        return False
+    return (
+        action.startswith("tap out at")
+        or action.startswith("transfer at")
+        or action.startswith("missing tap out")
+    )
+
+
+def increment_month(month_start):
+    year = month_start.year + (1 if month_start.month == 12 else 0)
+    month = 1 if month_start.month == 12 else month_start.month + 1
+    return datetime(year, month, 1).date()
+
+
+def build_balance_time_series(file_path):
+    raw_records = []
+
+    with open(file_path, newline="", encoding="utf-8") as csvfile:
+        reader = csv.reader(csvfile)
+        header = next(reader, None)
+        if not header:
+            return {
+                "labels": [],
+                "values": [],
+                "granularity": "month",
+                "change_labels": [],
+                "change_values": [],
+                "timeline_start": None,
+                "timeline_days": 0,
+                "change_points": [],
+                "intraday_days": [],
+            }
+
+        for row in reader:
+            # Mirror existing row cutoff logic: stop at first blank action row (column B).
+            if len(row) > 1 and not str(row[1]).strip():
+                break
+
+            if len(row) <= 5:
+                continue
+
+            timestamp_text = str(row[0]).strip()
+            if not timestamp_text:
+                continue
+
+            try:
+                dt = datetime.strptime(timestamp_text, TIMESTAMP_FORMAT)
+            except ValueError:
+                continue
+
+            # Balance is expected in column F.
+            amount = parse_balance_amount(row[5])
+            if amount is None:
+                continue
+
+            action_text = str(row[1]).strip() if len(row) > 1 else ""
+            journey_id = str(row[6]).strip() if len(row) > 6 else ""
+
+            raw_records.append({
+                "dt": dt,
+                "action": action_text,
+                "journey_id": journey_id,
+                "balance": amount,
+            })
+
+    if not raw_records:
+        return {
+            "labels": [],
+            "values": [],
+            "granularity": "month",
+            "change_labels": [],
+            "change_values": [],
+            "timeline_start": None,
+            "timeline_days": 0,
+            "change_points": [],
+            "intraday_days": [],
+        }
+
+    raw_records.sort(key=lambda item: item["dt"])
+
+    # Ignore in-journey intermediate station balances: keep only the final
+    # balance state for each multi-row journey that touches station-system events.
+    journey_indices = {}
+    for idx, record in enumerate(raw_records):
+        journey_id = record["journey_id"]
+        if not journey_id:
+            continue
+        journey_indices.setdefault(journey_id, []).append(idx)
+
+    journey_compacted = [True] * len(raw_records)
+
+    def is_station_system_action(action_text):
+        action = str(action_text or "").strip().lower()
+        if not action:
+            return False
+        if "bus stop" in action:
+            return False
+        return (
+            action.startswith("tap in at")
+            or action.startswith("tap out at")
+            or action.startswith("transfer at")
+            or action.startswith("missing tap in")
+            or action.startswith("missing tap out")
+        )
+
+    for _, indices in journey_indices.items():
+        if len(indices) < 2:
+            continue
+
+        group = [raw_records[idx] for idx in indices]
+        has_station_activity = any(is_station_system_action(item["action"]) for item in group)
+        if not has_station_activity:
+            continue
+
+        keep_pos = len(group) - 1
+
+        for pos, idx in enumerate(indices):
+            if pos != keep_pos:
+                journey_compacted[idx] = False
+
+    # For records without JourneyId, keep the previous fallback: if a station-pair Tap in
+    # is immediately followed by a settlement event with a higher balance, skip Tap in.
+    records = []
+    for i, current in enumerate(raw_records):
+        if not journey_compacted[i]:
+            continue
+
+        skip_as_provisional = False
+        if not current["journey_id"] and i + 1 < len(raw_records):
+            following = raw_records[i + 1]
+
+            if is_station_pair_tap(current["action"]) and is_station_pair_settlement(following["action"]):
+                current_balance = current["balance"]
+                next_balance = following["balance"]
+                # Temporary charge then partial add-back pattern.
+                if next_balance > current_balance:
+                    skip_as_provisional = True
+
+        if not skip_as_provisional:
+            records.append((current["dt"], current["balance"]))
+
+    if not records:
+        return {
+            "labels": [],
+            "values": [],
+            "granularity": "month",
+            "change_labels": [],
+            "change_values": [],
+            "timeline_start": None,
+            "timeline_days": 0,
+            "change_points": [],
+            "intraday_days": [],
+        }
+
+    start_date = records[0][0].date()
+    end_date = records[-1][0].date()
+    total_days = (end_date - start_date).days + 1
+    granularity = "week" if total_days <= 120 else "month"
+
+    def period_start_for(date_value):
+        if granularity == "week":
+            return date_value - timedelta(days=date_value.weekday())
+        return datetime(date_value.year, date_value.month, 1).date()
+
+    def period_label_for(period_start):
+        if granularity == "week":
+            return period_start.strftime("Week of %b %d, %Y")
+        return period_start.strftime("%b %Y")
+
+    change_labels = []
+    change_values = []
+    change_points = []
+    previous_balance = None
+    for dt, amount in records:
+        if previous_balance is None or abs(amount - previous_balance) > 1e-9:
+            day_index = (dt.date() - start_date).days
+            change_labels.append(dt.strftime("%b-%d-%Y"))
+            change_values.append(round(amount, 2))
+            change_points.append({
+                "x": day_index,
+                "y": round(amount, 2),
+                "date": dt.strftime("%b-%d-%Y"),
+            })
+            previous_balance = amount
+
+    intraday_days = []
+    points_by_day = OrderedDict()
+    for record in raw_records:
+        day_key = record["dt"].date().isoformat()
+        if day_key not in points_by_day:
+            points_by_day[day_key] = []
+
+        time_fraction = (
+            record["dt"].hour
+            + (record["dt"].minute / 60.0)
+            + (record["dt"].second / 3600.0)
+        )
+
+        points_by_day[day_key].append({
+            "timestamp": record["dt"].strftime("%b-%d-%Y %I:%M %p"),
+            "time": record["dt"].strftime("%I:%M %p"),
+            "hour_value": round(time_fraction, 4),
+            "balance": round(record["balance"], 2),
+            "action": record["action"],
+        })
+
+    for day_key, points in points_by_day.items():
+        date_value = datetime.strptime(day_key, "%Y-%m-%d").date()
+        change_count = 0
+        previous_value = None
+        for point in points:
+            value = point["balance"]
+            if previous_value is not None and abs(value - previous_value) > 1e-9:
+                change_count += 1
+            previous_value = value
+
+        intraday_days.append({
+            "date": day_key,
+            "display_date": date_value.strftime("%b %d, %Y"),
+            "day_index": (date_value - start_date).days,
+            "change_count": change_count,
+            "points": points,
+        })
+
+    period_latest = {}
+    for dt, amount in records:
+        current_date = dt.date()
+        period_key = period_start_for(current_date)
+
+        existing = period_latest.get(period_key)
+        if not existing or dt > existing[0]:
+            period_latest[period_key] = (dt, amount)
+
+    if granularity == "week":
+        period_cursor = start_date - timedelta(days=start_date.weekday())
+        final_period = end_date - timedelta(days=end_date.weekday())
+    else:
+        period_cursor = datetime(start_date.year, start_date.month, 1).date()
+        final_period = datetime(end_date.year, end_date.month, 1).date()
+
+    labels = []
+    values = []
+    carry_balance = None
+
+    while period_cursor <= final_period:
+        if period_cursor in period_latest:
+            carry_balance = period_latest[period_cursor][1]
+
+        labels.append(period_label_for(period_cursor))
+
+        values.append(round(carry_balance, 2) if carry_balance is not None else None)
+
+        if granularity == "week":
+            period_cursor = period_cursor + timedelta(days=7)
+        else:
+            period_cursor = increment_month(period_cursor)
+
+    return {
+        "labels": labels,
+        "values": values,
+        "granularity": granularity,
+        "change_labels": change_labels,
+        "change_values": change_values,
+        "timeline_start": start_date.isoformat(),
+        "timeline_days": total_days,
+        "change_points": change_points,
+        "intraday_days": intraday_days,
+    }
+
+
 @app.errorhandler(413)
 def file_too_large(_error):
     flash("CSV is too large. Maximum file size is 5 MB.")
@@ -2769,6 +3072,8 @@ def upload_file():
                         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
             month_values = [month_counts.get(i, 0) for i in range(12)]
 
+            balance_series = build_balance_time_series(fileName)
+
             os.remove(fileName)
             
             # Determine top station image URL (if available in utils.stationImages)
@@ -2963,6 +3268,15 @@ def upload_file():
                 countDays=countDays,
                 month=months,
                 month_values=month_values,
+                balance_labels=balance_series["labels"],
+                balance_values=balance_series["values"],
+                balance_granularity=balance_series["granularity"],
+                balance_change_labels=balance_series["change_labels"],
+                balance_change_values=balance_series["change_values"],
+                balance_timeline_start=balance_series["timeline_start"],
+                balance_timeline_days=balance_series["timeline_days"],
+                balance_change_points=balance_series["change_points"],
+                balance_intraday_days=balance_series["intraday_days"],
                 streak=streak, StreakStart=StreakStart, StreakEnd=StreakEnd,
                 topName=topName, topCount=topCount, topImage=topImage,
                 minutes=int(minutes),

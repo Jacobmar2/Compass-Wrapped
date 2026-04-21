@@ -5,7 +5,7 @@ import csv
 import uuid
 import utils
 from collections import Counter, OrderedDict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import calendar
 import re
 import heapq
@@ -154,13 +154,33 @@ def canonical_graph_station_name(name):
     return GRAPH_STATION_ALIASES.get(normalized, "")
 
 
-def _add_edge(graph, station_a, station_b, minutes):
+EXPO_MAIN_EAST_STATIONS = {
+    "Commercial-Broadway", "Nanaimo", "29th Avenue", "Joyce-Collingwood", "Patterson",
+    "Metrotown", "Royal Oak", "Edmonds", "22nd Street", "New Westminster", "Columbia",
+    "Scott Road", "Gateway", "Surrey Central", "King George",
+}
+
+
+def _add_edge(graph, station_a, station_b, minutes, line_name):
     graph.setdefault(station_a, {})
     graph.setdefault(station_b, {})
     existing = graph[station_a].get(station_b)
-    if existing is None or minutes < existing:
-        graph[station_a][station_b] = minutes
-        graph[station_b][station_a] = minutes
+    if existing is None:
+        edge = {"minutes": minutes, "lines": {line_name}}
+        graph[station_a][station_b] = edge
+        graph[station_b][station_a] = {"minutes": minutes, "lines": {line_name}}
+        return
+
+    if minutes < existing["minutes"]:
+        existing["minutes"] = minutes
+        existing["lines"] = {line_name}
+    elif minutes == existing["minutes"]:
+        existing["lines"].add(line_name)
+
+    graph[station_b][station_a] = {
+        "minutes": existing["minutes"],
+        "lines": set(existing["lines"]),
+    }
 
 
 def build_skytrain_graph():
@@ -202,19 +222,67 @@ def build_skytrain_graph():
     canada_yvr_times = [2, 2, 3]
 
     for i, minutes in enumerate(expo_main_times):
-        _add_edge(graph, expo_main[i], expo_main[i + 1], minutes)
+        _add_edge(graph, expo_main[i], expo_main[i + 1], minutes, "Expo")
     for i, minutes in enumerate(expo_branch_times):
-        _add_edge(graph, expo_branch[i], expo_branch[i + 1], minutes)
+        _add_edge(graph, expo_branch[i], expo_branch[i + 1], minutes, "Expo")
     for i, minutes in enumerate(millennium_times):
-        _add_edge(graph, millennium[i], millennium[i + 1], minutes)
+        _add_edge(graph, millennium[i], millennium[i + 1], minutes, "Millennium")
     for i, minutes in enumerate(canada_trunk_times):
-        _add_edge(graph, canada_trunk[i], canada_trunk[i + 1], minutes)
+        _add_edge(graph, canada_trunk[i], canada_trunk[i + 1], minutes, "Canada")
     for i, minutes in enumerate(canada_richmond_times):
-        _add_edge(graph, canada_richmond[i], canada_richmond[i + 1], minutes)
+        _add_edge(graph, canada_richmond[i], canada_richmond[i + 1], minutes, "Canada")
     for i, minutes in enumerate(canada_yvr_times):
-        _add_edge(graph, canada_yvr[i], canada_yvr[i + 1], minutes)
+        _add_edge(graph, canada_yvr[i], canada_yvr[i + 1], minutes, "Canada")
 
     return graph
+
+
+def _run_shortest_path_with_transfer_tiebreak(graph, start_station, end_station, banned_edges=None):
+    queue = [(0, 0, start_station, None, [start_station])]
+    best_cost = {}
+
+    while queue:
+        total_minutes, transfer_count, current_station, last_line, path = heapq.heappop(queue)
+
+        state_key = (current_station, last_line)
+        previous_best = best_cost.get(state_key)
+        current_cost = (total_minutes, transfer_count)
+        if previous_best is not None and current_cost >= previous_best:
+            continue
+        best_cost[state_key] = current_cost
+
+        if current_station == end_station:
+            return total_minutes, path, transfer_count
+
+        for neighbor, edge_data in graph[current_station].items():
+            edge_key = tuple(sorted((current_station, neighbor)))
+            if banned_edges and edge_key in banned_edges:
+                continue
+
+            edge_minutes = edge_data["minutes"]
+            edge_lines = edge_data["lines"]
+
+            if last_line is None:
+                next_lines = sorted(edge_lines)
+            elif last_line in edge_lines:
+                next_lines = [last_line]
+            else:
+                next_lines = sorted(edge_lines)
+
+            for next_line in next_lines:
+                add_transfer = 0 if last_line is None or next_line == last_line else 1
+                heapq.heappush(
+                    queue,
+                    (
+                        total_minutes + edge_minutes,
+                        transfer_count + add_transfer,
+                        neighbor,
+                        next_line,
+                        path + [neighbor],
+                    ),
+                )
+
+    return None, [], None
 
 
 def shortest_path_with_minutes(graph, start_station, end_station):
@@ -223,24 +291,26 @@ def shortest_path_with_minutes(graph, start_station, end_station):
     if start_station == end_station:
         return 0, [start_station]
 
-    queue = [(0, start_station, [start_station])]
-    best_minutes = {}
+    sapperton_or_braid = {"Sapperton", "Braid"}
+    uses_expo_main_east_special = (
+        (start_station in EXPO_MAIN_EAST_STATIONS and end_station in sapperton_or_braid)
+        or (end_station in EXPO_MAIN_EAST_STATIONS and start_station in sapperton_or_braid)
+    )
 
-    while queue:
-        total_minutes, current_station, path = heapq.heappop(queue)
-
-        if current_station in best_minutes and total_minutes >= best_minutes[current_station]:
-            continue
-        best_minutes[current_station] = total_minutes
-
-        if current_station == end_station:
+    if uses_expo_main_east_special:
+        blocked_lougheed_side = {tuple(sorted(("Braid", "Lougheed Town Centre")))}
+        total_minutes, path, _ = _run_shortest_path_with_transfer_tiebreak(
+            graph,
+            start_station,
+            end_station,
+            banned_edges=blocked_lougheed_side,
+        )
+        if total_minutes is not None:
             return total_minutes, path
 
-        for neighbor, edge_minutes in graph[current_station].items():
-            heapq.heappush(
-                queue,
-                (total_minutes + edge_minutes, neighbor, path + [neighbor]),
-            )
+    total_minutes, path, _ = _run_shortest_path_with_transfer_tiebreak(graph, start_station, end_station)
+    if total_minutes is not None:
+        return total_minutes, path
 
     return None, []
 
@@ -312,7 +382,7 @@ def build_segment_usage_from_pairs(pair_counts):
             left = path[i]
             right = path[i + 1]
             edge_key = tuple(sorted((left, right)))
-            edge_minutes = graph[left][right]
+            edge_minutes = graph[left][right]["minutes"]
             segment_uses[edge_key] += uses
             segment_minutes[edge_key] += uses * edge_minutes
 
@@ -1395,15 +1465,610 @@ def parse_balance_amount(balance_text):
         return None
 
     # Compass exports can include extra text; use the last money-like number as balance.
-    matches = re.findall(r"-?\$?\s*\d+(?:,\d{3})*(?:\.\d+)?", text)
+    matches = re.findall(r"\(?-?\$?\s*\d+(?:,\d{3})*(?:\.\d+)?\)?", text)
     if not matches:
         return None
 
-    candidate = matches[-1].replace("$", "").replace(",", "").strip()
+    candidate = matches[-1].strip()
+    is_parenthesized_negative = candidate.startswith("(") and candidate.endswith(")")
+    candidate = candidate.replace("(", "").replace(")", "")
+    candidate = candidate.replace("$", "").replace(",", "").strip()
     try:
-        return float(candidate)
+        value = float(candidate)
+        return -value if is_parenthesized_negative else value
     except ValueError:
         return None
+
+
+def parse_amount_value(amount_text):
+    text = str(amount_text or "").strip()
+    if not text:
+        return None
+
+    matches = re.findall(r"\(?-?\$?\s*\d+(?:,\d{3})*(?:\.\d+)?\)?", text)
+    if not matches:
+        return None
+
+    candidate = matches[0].strip()
+    is_parenthesized_negative = candidate.startswith("(") and candidate.endswith(")")
+    candidate = candidate.replace("(", "").replace(")", "")
+    candidate = candidate.replace("$", "").replace(",", "").strip()
+
+    try:
+        value = float(candidate)
+        return -value if is_parenthesized_negative else value
+    except ValueError:
+        return None
+
+
+MONTHLY_FARE_EFFECTIVE_BY_ZONE = {
+    1: [
+        (datetime(2023, 7, 1).date(), 104.90),
+        (datetime(2024, 7, 1).date(), 107.30),
+        (datetime(2025, 7, 1).date(), 111.60),
+    ],
+    2: [
+        (datetime(2023, 7, 1).date(), 140.25),
+        (datetime(2024, 7, 1).date(), 143.50),
+        (datetime(2025, 7, 1).date(), 149.25),
+    ],
+    3: [
+        (datetime(2023, 7, 1).date(), 189.45),
+        (datetime(2024, 7, 1).date(), 193.80),
+        (datetime(2025, 7, 1).date(), 201.55),
+    ],
+}
+
+DAYPASS_FARE_EFFECTIVE = [
+    (datetime(2023, 7, 1).date(), 11.25),
+    (datetime(2024, 7, 1).date(), 11.50),
+    (datetime(2025, 7, 1).date(), 11.95),
+]
+
+UPASS_FARE_EFFECTIVE = [
+    (datetime(2023, 5, 1).date(), 45.10),
+    (datetime(2024, 5, 1).date(), 46.00),
+    (datetime(2025, 9, 1).date(), 46.90),
+]
+
+COMPASS_FARE_EFFECTIVE_BY_ZONE = {
+    1: [
+        (datetime(2023, 7, 1).date(), 2.55),
+        (datetime(2024, 7, 1).date(), 2.60),
+        (datetime(2025, 7, 1).date(), 2.70),
+    ],
+    2: [
+        (datetime(2023, 7, 1).date(), 3.75),
+        (datetime(2024, 7, 1).date(), 3.85),
+        (datetime(2025, 7, 1).date(), 4.00),
+    ],
+    3: [
+        (datetime(2023, 7, 1).date(), 4.80),
+        (datetime(2024, 7, 1).date(), 4.90),
+        (datetime(2025, 7, 1).date(), 5.10),
+    ],
+}
+
+AIRPORT_ADD_FARE = 5.00
+
+ZONE_1_STATIONS = {
+    "Waterfront Stn", "Burrard Stn", "Granville Stn", "Stadium Stn", "Main Street Stn",
+    "Commercial-Broadway Stn", "Nanaimo Stn", "29th Av Stn", "Joyce Stn", "VCC-Clark Stn",
+    "Renfrew Stn", "Rupert Stn", "Vancouver City Centre Stn", "Yaletown-Roundhouse Stn",
+    "Olympic Village Stn", "Broadway-City Hall Stn", "King Edward Stn", "Oakridge-41st Stn",
+    "Langara-49th Stn", "Marine Drive Stn",
+}
+
+ZONE_2_STATIONS = {
+    "Patterson Stn", "Metrotown Stn", "Royal Oak Stn", "Edmonds Stn", "22nd St Stn",
+    "New Westminster Stn", "Columbia Stn", "Sapperton Stn", "Braid Stn", "Lougheed Stn",
+    "Production Way Stn", "Gilmore Stn", "Brentwood Stn", "Holdom Stn", "Sperling Stn",
+    "Lake City Way Stn", "Bridgeport Stn", "Capstan Stn", "Aberdeen Stn", "Lansdowne Stn",
+    "Brighouse Stn",
+}
+
+ZONE_2_LONSDALE_STATIONS = {"Lonsdale Quay", "Lonsdale Quay Stn"}
+
+AIRPORT_STATIONS = {"Sea Island Centre Stn", "Templeton Stn", "YVR-Airport Stn"}
+
+ZONE_3A_STATIONS = {"Scott Road Stn", "Gateway Stn", "Surrey Central Stn", "King George Stn"}
+ZONE_3B_STATIONS = {
+    "Burquitlam Stn", "Moody Center Stn", "Inlet Centre Stn", "Coquitlam Central Stn",
+    "Lincoln Stn", "Lafarge Lake/Douglas College Stn",
+}
+
+STATION_NAME_ZONE_ALIASES = {
+    "Vancouver City Center Stn": "Vancouver City Centre Stn",
+    "Stadium-Chinatown Stn": "Stadium Stn",
+    "Main Street-Science World Stn": "Main Street Stn",
+    "Joyce-Collingwood Stn": "Joyce Stn",
+    "Lougheed Town Centre Stn": "Lougheed Stn",
+    "Brentwood Town Centre Stn": "Brentwood Stn",
+    "Sperling-Burnaby Lake Stn": "Sperling Stn",
+    "Lafarge Lake-Douglas Stn": "Lafarge Lake/Douglas College Stn",
+    "YVR Airport Stn": "YVR-Airport Stn",
+    "Lonsdale Quay - Seabus": "Lonsdale Quay",
+}
+
+
+def fare_for_date(effective_price_points, target_date):
+    if not effective_price_points:
+        return 0.0
+
+    selected = effective_price_points[0][1]
+    for effective_date, price in effective_price_points:
+        if target_date >= effective_date:
+            selected = price
+        else:
+            break
+    return float(selected)
+
+
+def normalize_station_for_zone_lookup(raw_station_name):
+    station_name = utils.canonicalize_station_name(str(raw_station_name or "").strip())
+    station_name = station_name.replace("- WCE", "").strip()
+    station_name = STATION_NAME_ZONE_ALIASES.get(station_name, station_name)
+    return station_name
+
+
+def station_zone_key(station_name):
+    normalized = normalize_station_for_zone_lookup(station_name)
+    if normalized in AIRPORT_STATIONS:
+        return "airport"
+    if normalized in ZONE_1_STATIONS:
+        return "z1"
+    if normalized in ZONE_2_LONSDALE_STATIONS:
+        return "z2lq"
+    if normalized in ZONE_2_STATIONS:
+        return "z2"
+    if normalized in ZONE_3A_STATIONS:
+        return "z3a"
+    if normalized in ZONE_3B_STATIONS:
+        return "z3b"
+    return None
+
+
+def parse_tap_event(action_text):
+    action = str(action_text or "").strip()
+    lowered = action.lower()
+
+    is_tap_like = (
+        lowered.startswith("tap in at")
+        or lowered.startswith("tap out at")
+        or lowered.startswith("transfer at")
+        or lowered.startswith("missing tap in at")
+        or lowered.startswith("missing tap out at")
+    )
+    if not is_tap_like:
+        return None
+
+    if " at " not in action:
+        return None
+
+    location_name = action.split(" at ", 1)[1].strip()
+    is_bus = "bus stop" in location_name.lower() or "bus stop" in lowered
+
+    return {
+        "action": action,
+        "is_bus": is_bus,
+        "station": None if is_bus else normalize_station_for_zone_lookup(location_name),
+        "is_tap_in": lowered.startswith("tap in at"),
+    }
+
+
+def build_trip_blocks(rows):
+    tap_rows = []
+    for row in rows:
+        parsed = parse_tap_event(row.get("action", ""))
+        if not parsed:
+            continue
+        tap_rows.append({
+            "dt": row["dt"],
+            "event": parsed,
+        })
+
+    blocks = []
+    current_block = None
+
+    for item in tap_rows:
+        if item["event"]["is_tap_in"]:
+            if current_block:
+                blocks.append(current_block)
+            current_block = [item]
+            continue
+
+        if current_block:
+            current_block.append(item)
+
+    if current_block:
+        blocks.append(current_block)
+
+    return blocks
+
+
+def simulated_stored_value_fare_for_block(block, travel_date):
+    if not block:
+        return 0.0
+
+    events = [entry["event"] for entry in block]
+    station_events = [event for event in events if not event["is_bus"] and event["station"]]
+    has_bus = any(event["is_bus"] for event in events)
+
+    if not station_events:
+        return fare_for_date(COMPASS_FARE_EFFECTIVE_BY_ZONE[1], travel_date)
+
+    zone_keys = {station_zone_key(event["station"]) for event in station_events}
+    zone_keys.discard(None)
+
+    start_dt = block[0]["dt"] if block and block[0].get("dt") else None
+    one_zone_override = False
+    if start_dt:
+        starts_after_evening_cutoff = start_dt.time() > time(18, 30)
+        starts_on_weekend = start_dt.weekday() >= 5
+        one_zone_override = starts_after_evening_cutoff or starts_on_weekend
+
+    airport_only = bool(zone_keys) and zone_keys == {"airport"} and not has_bus
+    if one_zone_override:
+        base_fare = fare_for_date(COMPASS_FARE_EFFECTIVE_BY_ZONE[1], travel_date)
+    elif airport_only:
+        base_fare = 0.0
+    else:
+        if len(zone_keys) <= 1:
+            zone_count = 1
+        elif "z1" in zone_keys and ("z3a" in zone_keys or "z3b" in zone_keys):
+            zone_count = 3
+        else:
+            zone_count = 2
+
+        base_fare = fare_for_date(COMPASS_FARE_EFFECTIVE_BY_ZONE[zone_count], travel_date)
+
+    add_fare = 0.0
+    first_station_tap_in = next(
+        (event for event in events if event["is_tap_in"] and not event["is_bus"] and event["station"]),
+        None,
+    )
+    if first_station_tap_in and station_zone_key(first_station_tap_in["station"]) == "airport" and not airport_only:
+        add_fare = AIRPORT_ADD_FARE
+
+    return round(base_fare + add_fare, 2)
+
+
+def period_balance_spent(filtered_rows):
+    if not filtered_rows:
+        return 0.0
+
+    sorted_rows = sorted(filtered_rows, key=lambda item: item["dt"])
+    top_balance = next((row["balance"] for row in reversed(sorted_rows) if row["balance"] is not None), None)
+    bottom_balance = next((row["balance"] for row in sorted_rows if row["balance"] is not None), None)
+
+    topups = 0.0
+    bottom_index = len(sorted_rows) - 1
+    for index, row in enumerate(sorted_rows):
+        action_lower = str(row["action"]).strip().lower()
+        if not (action_lower.startswith("loaded at") or action_lower.startswith("purchase at")):
+            continue
+        if index == bottom_index:
+            continue
+        amount_value = row["amount"]
+        if amount_value is not None and amount_value > 0:
+            topups += amount_value
+
+    if top_balance is not None and bottom_balance is not None:
+        spent = (bottom_balance - top_balance) + topups
+    else:
+        spent = topups
+
+    return round(max(0.0, spent), 2)
+
+
+def build_balance_spend_summary(file_path):
+    rows = []
+
+    with open(file_path, newline="", encoding="utf-8") as csvfile:
+        reader = csv.reader(csvfile)
+        _header = next(reader, None)
+
+        for row in reader:
+            if len(row) > 1 and not str(row[1]).strip():
+                break
+
+            if len(row) <= 5:
+                continue
+
+            timestamp_text = str(row[0]).strip()
+            action_text = str(row[1]).strip() if len(row) > 1 else ""
+            product_text = str(row[2]).strip() if len(row) > 2 else ""
+            amount_text = str(row[4]).strip() if len(row) > 4 else ""
+            balance_text = str(row[5]).strip() if len(row) > 5 else ""
+
+            if not timestamp_text:
+                continue
+
+            try:
+                dt = datetime.strptime(timestamp_text, TIMESTAMP_FORMAT)
+            except ValueError:
+                continue
+
+            rows.append({
+                "dt": dt,
+                "action": action_text,
+                "product": product_text,
+                "amount": parse_amount_value(amount_text),
+                "balance": parse_balance_amount(balance_text),
+            })
+
+    if not rows:
+        return {
+            "stored_value_spent": 0.0,
+            "pass_spend": 0.0,
+            "pass_count": 0,
+            "total_spent": 0.0,
+            "extra_stored_value_if_no_pass": 0.0,
+            "extra_stored_value_by_month": {},
+            "extra_stored_value_by_day": {},
+        }
+
+    top_balance = next((row["balance"] for row in rows if row["balance"] is not None), None)
+    bottom_balance = next((row["balance"] for row in reversed(rows) if row["balance"] is not None), None)
+
+    loaded_sum = 0.0
+    bottom_index = len(rows) - 1
+    for index, row in enumerate(rows):
+        action_lower = str(row["action"]).strip().lower()
+        is_top_up_row = action_lower.startswith("loaded at") or action_lower.startswith("purchase at")
+        if not is_top_up_row:
+            continue
+
+        # Exclude oldest-row top-up if it represents the initial loaded balance baseline.
+        if index == bottom_index:
+            continue
+
+        amount_value = row["amount"]
+        if amount_value is not None and amount_value > 0:
+            loaded_sum += amount_value
+
+    stored_value_spent = 0.0
+    if top_balance is not None and bottom_balance is not None:
+        stored_value_spent = (bottom_balance - top_balance) + loaded_sum
+    else:
+        stored_value_spent = loaded_sum
+
+    monthly_seen = set()
+    upass_seen = set()
+    daypass_seen = set()
+    covered_months = set()
+    covered_daypasses = set()
+    pass_spend = 0.0
+    pass_count = 0
+
+    for row in rows:
+        product_lower = str(row["product"]).strip().lower()
+        action_lower = str(row["action"]).strip().lower()
+        dt = row["dt"]
+
+        if not product_lower:
+            continue
+
+        # Do not count pass products from reload events like "Loaded at ...".
+        if action_lower.startswith("loaded at"):
+            continue
+
+        if "upass" in product_lower:
+            key = (dt.year, dt.month)
+            if key in upass_seen:
+                continue
+            upass_seen.add(key)
+            covered_months.add(key)
+            pass_spend += fare_for_date(UPASS_FARE_EFFECTIVE, dt.date())
+            pass_count += 1
+            continue
+
+        if "monthly pass" in product_lower:
+            zone_match = re.search(r"([123])\s*zone", product_lower)
+            zone = int(zone_match.group(1)) if zone_match else 1
+            key = (dt.year, dt.month, zone)
+            if key in monthly_seen:
+                continue
+            monthly_seen.add(key)
+            covered_months.add((dt.year, dt.month))
+            pass_spend += fare_for_date(MONTHLY_FARE_EFFECTIVE_BY_ZONE.get(zone, MONTHLY_FARE_EFFECTIVE_BY_ZONE[1]), dt.date())
+            pass_count += 1
+            continue
+
+        if "day pass" in product_lower or "daypass" in product_lower:
+            key = dt.date()
+            if key in daypass_seen:
+                continue
+            daypass_seen.add(key)
+            covered_daypasses.add(dt.date())
+            pass_spend += fare_for_date(DAYPASS_FARE_EFFECTIVE, dt.date())
+            pass_count += 1
+
+    effective_daypasses = {
+        day for day in covered_daypasses if (day.year, day.month) not in covered_months
+    }
+
+    def coverage_bucket(target_date):
+        month_key = (target_date.year, target_date.month)
+        if month_key in covered_months:
+            return ("month", month_key)
+        if target_date in effective_daypasses:
+            return ("day", target_date)
+        return None
+
+    rows_chronological = sorted(rows, key=lambda item: item["dt"])
+    trip_blocks = build_trip_blocks(rows_chronological)
+
+    simulated_stored_value_by_month = {}
+    simulated_stored_value_by_day = {}
+    for block in trip_blocks:
+        start_dt = block[0]["dt"]
+        travel_date = start_dt.date()
+        bucket = coverage_bucket(travel_date)
+        if not bucket:
+            continue
+        bucket_kind, bucket_key = bucket
+        simulated_fare = simulated_stored_value_fare_for_block(block, travel_date)
+        if bucket_kind == "month":
+            simulated_stored_value_by_month[bucket_key] = (
+                simulated_stored_value_by_month.get(bucket_key, 0.0) + simulated_fare
+            )
+        else:
+            simulated_stored_value_by_day[bucket_key] = (
+                simulated_stored_value_by_day.get(bucket_key, 0.0) + simulated_fare
+            )
+
+    actual_balance_spent_by_month = {}
+    for year, month in covered_months:
+        month_rows = [
+            row for row in rows
+            if row["dt"].year == year and row["dt"].month == month
+        ]
+        actual_balance_spent_by_month[(year, month)] = period_balance_spent(month_rows)
+
+    actual_balance_spent_by_day = {}
+    for day in effective_daypasses:
+        day_rows = [row for row in rows if row["dt"].date() == day]
+        actual_balance_spent_by_day[day] = period_balance_spent(day_rows)
+
+    extra_stored_value_by_month = {}
+    for year, month in sorted(covered_months):
+        month_key = f"{year:04d}-{month:02d}"
+        simulated_value = simulated_stored_value_by_month.get((year, month), 0.0)
+        actual_value = actual_balance_spent_by_month.get((year, month), 0.0)
+        extra_stored_value_by_month[month_key] = round(max(0.0, simulated_value - actual_value), 2)
+
+    extra_stored_value_by_day = {}
+    for day in sorted(effective_daypasses):
+        day_key = day.isoformat()
+        simulated_value = simulated_stored_value_by_day.get(day, 0.0)
+        actual_value = actual_balance_spent_by_day.get(day, 0.0)
+        extra_stored_value_by_day[day_key] = round(max(0.0, simulated_value - actual_value), 2)
+
+    extra_stored_value_if_no_pass = sum(extra_stored_value_by_month.values()) + sum(extra_stored_value_by_day.values())
+
+    stored_value_spent = round(max(0.0, stored_value_spent), 2)
+    pass_spend = round(max(0.0, pass_spend), 2)
+    total_spent = round(stored_value_spent + pass_spend, 2)
+    extra_stored_value_if_no_pass = round(max(0.0, extra_stored_value_if_no_pass), 2)
+
+    return {
+        "stored_value_spent": stored_value_spent,
+        "pass_spend": pass_spend,
+        "pass_count": int(pass_count),
+        "total_spent": total_spent,
+        "extra_stored_value_if_no_pass": extra_stored_value_if_no_pass,
+        "extra_stored_value_by_month": extra_stored_value_by_month,
+        "extra_stored_value_by_day": extra_stored_value_by_day,
+    }
+
+
+def build_pass_timeline_entries(file_path):
+    rows = []
+
+    with open(file_path, newline="", encoding="utf-8") as csvfile:
+        reader = csv.reader(csvfile)
+        _header = next(reader, None)
+
+        for row in reader:
+            if len(row) > 1 and not str(row[1]).strip():
+                break
+
+            if len(row) <= 2:
+                continue
+
+            timestamp_text = str(row[0]).strip()
+            action_text = str(row[1]).strip()
+            product_text = str(row[2]).strip()
+
+            if not timestamp_text or not product_text:
+                continue
+
+            try:
+                dt = datetime.strptime(timestamp_text, TIMESTAMP_FORMAT)
+            except ValueError:
+                continue
+
+            rows.append({
+                "dt": dt,
+                "action": action_text,
+                "product": product_text,
+            })
+
+    if not rows:
+        return []
+
+    rows.sort(key=lambda item: item["dt"])
+
+    entries = []
+    monthly_seen = set()
+    upass_seen = set()
+    daypass_seen = set()
+
+    for row in rows:
+        product_text = str(row["product"]).strip()
+        product_lower = product_text.lower()
+        action_lower = str(row["action"]).strip().lower()
+        dt = row["dt"]
+
+        # Exclude reload-only rows from pass timeline entries.
+        if action_lower.startswith("loaded at"):
+            continue
+
+        if "upass" in product_lower:
+            key = (dt.year, dt.month)
+            if key in upass_seen:
+                continue
+            upass_seen.add(key)
+            price = fare_for_date(UPASS_FARE_EFFECTIVE, dt.date())
+            entries.append({
+                "label": f"UPass - {dt.strftime('%b')}",
+                "date": dt.strftime("%Y-%m-%d"),
+                "timestamp": dt.strftime(TIMESTAMP_FORMAT),
+                "price": round(price, 2),
+                "month_key": dt.strftime("%Y-%m"),
+                "period_type": "month",
+                "period_key": dt.strftime("%Y-%m"),
+            })
+            continue
+
+        if "monthly pass" in product_lower:
+            zone_match = re.search(r"([123])\s*zone", product_text, flags=re.IGNORECASE)
+            zone = int(zone_match.group(1)) if zone_match else 1
+            zone_label = f"{zone_match.group(1)} Zone Monthly Pass" if zone_match else "Monthly Pass"
+            key = (zone_label.lower(), dt.year, dt.month)
+            if key in monthly_seen:
+                continue
+            monthly_seen.add(key)
+            price = fare_for_date(MONTHLY_FARE_EFFECTIVE_BY_ZONE.get(zone, MONTHLY_FARE_EFFECTIVE_BY_ZONE[1]), dt.date())
+            entries.append({
+                "label": f"{zone_label} - {dt.strftime('%b')}",
+                "date": dt.strftime("%Y-%m-%d"),
+                "timestamp": dt.strftime(TIMESTAMP_FORMAT),
+                "price": round(price, 2),
+                "month_key": dt.strftime("%Y-%m"),
+                "period_type": "month",
+                "period_key": dt.strftime("%Y-%m"),
+            })
+            continue
+
+        if "day pass" in product_lower or "daypass" in product_lower:
+            key = dt.date().isoformat()
+            if key in daypass_seen:
+                continue
+            daypass_seen.add(key)
+            price = fare_for_date(DAYPASS_FARE_EFFECTIVE, dt.date())
+            entries.append({
+                "label": f"Day Pass - {dt.strftime('%b')} {dt.day}",
+                "date": dt.strftime("%Y-%m-%d"),
+                "timestamp": dt.strftime(TIMESTAMP_FORMAT),
+                "price": round(price, 2),
+                "month_key": dt.strftime("%Y-%m"),
+                "period_type": "day",
+                "period_key": dt.strftime("%Y-%m-%d"),
+            })
+
+    return entries
 
 
 def is_station_pair_tap(action_text):
@@ -3073,6 +3738,8 @@ def upload_file():
             month_values = [month_counts.get(i, 0) for i in range(12)]
 
             balance_series = build_balance_time_series(fileName)
+            balance_spend_summary = build_balance_spend_summary(fileName)
+            pass_timeline_entries = build_pass_timeline_entries(fileName)
 
             os.remove(fileName)
             
@@ -3277,6 +3944,14 @@ def upload_file():
                 balance_timeline_days=balance_series["timeline_days"],
                 balance_change_points=balance_series["change_points"],
                 balance_intraday_days=balance_series["intraday_days"],
+                stored_value_spent=balance_spend_summary["stored_value_spent"],
+                pass_spend=balance_spend_summary["pass_spend"],
+                pass_count=balance_spend_summary["pass_count"],
+                total_transit_spent=balance_spend_summary["total_spent"],
+                extra_stored_value_if_no_pass=balance_spend_summary["extra_stored_value_if_no_pass"],
+                extra_stored_value_by_month=balance_spend_summary["extra_stored_value_by_month"],
+                extra_stored_value_by_day=balance_spend_summary["extra_stored_value_by_day"],
+                pass_timeline_entries=pass_timeline_entries,
                 streak=streak, StreakStart=StreakStart, StreakEnd=StreakEnd,
                 topName=topName, topCount=topCount, topImage=topImage,
                 minutes=int(minutes),

@@ -64,39 +64,18 @@ Made by Jacob Martinez
 
 ## How to Host Locally
 
-1. Clone this repository and move into the project folder.
+1. Download ZIP and extract files into a selected folder.
+
+2. Using a terminal (with command prompt or an IDE of your choice), navigate to the selected folder, then to the Compass-Wrapped-main folder, by typing the following:
 
 ```bash
-git clone https://github.com/<your-username>/CompassWrapped.git
-cd CompassWrapped
+cd Compass-Wrapped-main
 ```
 
-2. Create and activate a virtual environment.
-
-Windows (PowerShell):
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-macOS/Linux:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-3. Install dependencies.
-
-```bash
-pip install -r requirements.txt
-```
-
-4. Run the app.
+3. Type in terminal: 
 
 ```bash
 python app.py
 ```
 
-5. Open your browser at http://127.0.0.1:5000/ and upload your Compass Card CSV.
+4. Open your browser at http://127.0.0.1:5000/ and upload your Compass Card CSV.

@@ -29,6 +29,7 @@
                     <li><a href="#topStationPairsSection" class="sidebar-link sidebar-sublink" data-section="topStationPairsSection" data-requires-deeper="true">Station Pairs</a></li>
                     <li><a href="#skytrainSegmentsSection" class="sidebar-link sidebar-sublink" data-section="skytrainSegmentsSection" data-requires-deeper="true">SkyTrain Segments Map</a></li>
                     <li><a href="#dayHourCarouselContainer" class="sidebar-link sidebar-sublink" data-section="dayHourCarouselContainer" data-requires-deeper="true">Days of the Week Hourly Usage</a></li>
+                    <li><a href="#passTimelineSection" class="sidebar-link sidebar-sublink" data-section="passTimelineSection" data-requires-deeper="true">Pass Savings</a></li>
                 </ul>
             </li>
         </ul>
@@ -383,6 +384,23 @@
                 <canvas id="balanceDayChart"></canvas>
             </div>
         </div>
+
+        <div class="balance-spend-summary" aria-label="Total spending summary">
+            <div class="balance-spend-item">
+                <div class="balance-spend-value">${{ '%.2f'|format(stored_value_spent) }}</div>
+                <div class="balance-spend-label">in stored value</div>
+            </div>
+            <div class="balance-spend-operator">+</div>
+            <div class="balance-spend-item">
+                <div class="balance-spend-value">${{ '%.2f'|format(pass_spend) }}</div>
+                <div class="balance-spend-label">{{ pass_count }} day/month passes</div>
+            </div>
+            <div class="balance-spend-operator">=</div>
+            <div class="balance-spend-item">
+                <div class="balance-spend-value">${{ '%.2f'|format(total_transit_spent) }}</div>
+                <div class="balance-spend-label">total amount</div>
+            </div>
+        </div>
         {% else %}
         <p>No balance history found in BalanceDetails for this CSV.</p>
         {% endif %}
@@ -461,6 +479,36 @@
         <button class="carousel-btn left" onclick="moveDayHourSlide(-1)">❮</button>
         <button class="carousel-btn right" onclick="moveDayHourSlide(1)">❯</button>
 
+    </div>
+
+    <div class="results-card map-card" id="passTimelineSection">
+        <h2>Pass Savings</h2>
+        <p class="map-subtitle">day/month pass entries detected.</p>
+        {% if pass_timeline_entries %}
+        <div class="pass-timeline-buttons" role="list" aria-label="Pass timeline entries">
+            {% for entry in pass_timeline_entries %}
+            <button
+                type="button"
+                class="sort-btn pass-timeline-btn"
+                data-pass-button="true"
+                data-pass-label="{{ entry.label }}"
+                data-pass-price="{{ '%.2f'|format(entry.price or 0) }}"
+                data-pass-period-type="{{ entry.period_type }}"
+                data-pass-period-key="{{ entry.period_key }}"
+                data-pass-extra="{{ '%.2f'|format(extra_stored_value_by_day.get(entry.period_key, 0) if entry.period_type == 'day' else extra_stored_value_by_month.get(entry.period_key, 0)) }}"
+                title="{{ entry.timestamp }}"
+            >
+                {{ entry.label }}
+            </button>
+            {% endfor %}
+        </div>
+        <p id="passTimelinePromptText" class="pass-price-text">Select a day/month pass to see its savings.</p>
+        <p id="passTimelinePriceText" class="pass-price-text" style="display: none;"></p>
+        <p id="passTimelineExtraText" class="pass-extra-spend-text" style="display: none;"></p>
+        <p id="passTimelineSavingsText" class="pass-extra-spend-text" style="display: none;"></p>
+        {% else %}
+        <p>No day/month pass entries found in this CSV.</p>
+        {% endif %}
     </div>
 
 

@@ -60,9 +60,26 @@
 
     </div>
 
+    <div id="loadingOverlay" class="loading-overlay" aria-live="polite" aria-hidden="true">
+        <div class="loading-overlay-content" role="status">
+            <div class="loading-overlay-spinner" aria-hidden="true"></div>
+            <p id="loadingOverlayText" class="loading-overlay-text">Revealing Your Compass Wrapped</p>
+        </div>
+    </div>
+
     <script>
+        const homeUploadForm = document.querySelector(".home-upload-form");
         const homeFileInput = document.getElementById("homeFileInput");
         const homeSelectedFileName = document.getElementById("homeSelectedFileName");
+        const loadingOverlay = document.getElementById("loadingOverlay");
+        const loadingOverlayText = document.getElementById("loadingOverlayText");
+
+        function showLoadingOverlay(message) {
+            if (!loadingOverlay || !loadingOverlayText) return;
+            loadingOverlayText.textContent = message;
+            loadingOverlay.classList.add("is-visible");
+            loadingOverlay.setAttribute("aria-hidden", "false");
+        }
 
         function updateSelectedFileName(input, output, emptyText) {
             if (!input || !output) return;
@@ -76,6 +93,12 @@
                 updateSelectedFileName(homeFileInput, homeSelectedFileName, "No file selected.");
             });
             updateSelectedFileName(homeFileInput, homeSelectedFileName, "No file selected.");
+        }
+
+        if (homeUploadForm) {
+            homeUploadForm.addEventListener("submit", () => {
+                showLoadingOverlay("Revealing Your Compass Wrapped");
+            });
         }
     </script>
 

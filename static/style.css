@@ -9,6 +9,56 @@ body {
     align-items: center;
 }
 
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 23, 36, 0.85);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 24px;
+    --loading-overlay-x-offset: 30px;
+}
+
+.loading-overlay.is-visible {
+    display: flex;
+}
+
+.loading-overlay-content {
+    background: #009cde;
+    color: #ffffff;
+    border-radius: 14px;
+    padding: 20px 24px;
+    text-align: center;
+    width: min(92vw, 520px);
+    margin: 0 auto;
+    transform: translateX(var(--loading-overlay-x-offset));
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.loading-overlay-spinner {
+    width: 34px;
+    height: 34px;
+    border: 4px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    margin: 0 auto 12px auto;
+    animation: loading-overlay-spin 0.85s linear infinite;
+}
+
+.loading-overlay-text {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+@keyframes loading-overlay-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 
 
 .card2, .card {
@@ -722,6 +772,48 @@ html {
     margin: 0;
 }
 
+.balance-spend-summary {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(23, 48, 66, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.balance-spend-item {
+    min-width: 130px;
+}
+
+.balance-spend-value {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #0059b3;
+}
+
+.balance-spend-label {
+    margin-top: 3px;
+    font-size: 0.86rem;
+    color: #3f5c73;
+}
+
+.balance-spend-operator {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #173042;
+    padding: 0 4px;
+}
+
+.balance-extra-spend {
+    margin: 10px 0 0;
+    text-align: center;
+    font-size: 0.95rem;
+    color: #173042;
+    font-weight: 600;
+}
+
 .carousel-viewport {
     overflow: hidden;
     border-radius: 12px;
@@ -1062,6 +1154,64 @@ html {
 .segment-usage-total-label {
     font-size: 0.9rem;
     font-weight: 700;
+}
+
+.pass-timeline-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.pass-timeline-btn {
+    margin: 0;
+    color: #ffffff;
+}
+
+#passTimelineSection h2 {
+    font-size: 2.2rem;
+}
+
+.pass-price-text {
+    margin: 12px 0 0;
+    color: #e8f7ff;
+    font-weight: 700;
+    text-align: center;
+    font-size: 1.8rem;
+    line-height: 1.15;
+}
+
+.pass-price-amount {
+    color: #fed200;
+    font-weight: 800;
+}
+
+.pass-savings-amount-positive {
+    color: #2ff98a;
+    font-weight: 800;
+}
+
+.pass-extra-spend-text {
+    margin: 12px 0 0;
+    text-align: center;
+    color: #e8f7ff;
+    font-size: 1.8rem;
+    line-height: 1.15;
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    #passTimelineSection h2 {
+        font-size: 1.6rem;
+    }
+
+    #passTimelinePromptText,
+    #passTimelinePriceText,
+    #passTimelineExtraText,
+    #passTimelineSavingsText {
+        font-size: 1.2rem;
+        line-height: 1.2;
+    }
 }
 
 #skytrainTotalDistanceValue {

@@ -60,6 +60,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function bindAxisLabelTooltip(chart, { axis = 'x' } = {}) {
     if (!chart || !chart.canvas) return;
 
+    let axisTooltipActive = false;
+    let lastAxisIndex = null;
+
     const getPointerPosition = (event) => {
       const point = event.touches && event.touches.length ? event.touches[0] : event;
       const rect = chart.canvas.getBoundingClientRect();
@@ -97,6 +100,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const showTooltipForIndex = (index) => {
+      if (axisTooltipActive && lastAxisIndex === index) return;
+
       const element = chart.getDatasetMeta(0)?.data?.[index];
       if (!element) return;
 
@@ -106,14 +111,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (chart.tooltip) {
         chart.tooltip.setActiveElements(active, position);
       }
+      axisTooltipActive = true;
+      lastAxisIndex = index;
       chart.update('none');
     };
 
     const clearTooltip = () => {
+      if (!axisTooltipActive) return;
+
       chart.setActiveElements([]);
       if (chart.tooltip) {
         chart.tooltip.setActiveElements([], { x: 0, y: 0 });
       }
+      axisTooltipActive = false;
+      lastAxisIndex = null;
       chart.update('none');
     };
 
@@ -404,6 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const topStationPairsSection = $('topStationPairsSection');
   const skytrainSegmentsSection = $('skytrainSegmentsSection');
   const dayHourCarouselContainer = $('dayHourCarouselContainer');
+  const passTimelineSection = $('passTimelineSection');
   const deeperStatsToggle = $('deeperStatsToggle');
   const dayHourCharts = [];
   let refreshSkytrainSegmentsMap = null;
@@ -450,6 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (topStationPairsSection) topStationPairsSection.style.display = displayValue;
     if (skytrainSegmentsSection) skytrainSegmentsSection.style.display = displayValue;
     if (dayHourCarouselContainer) dayHourCarouselContainer.style.display = displayValue;
+    if (passTimelineSection) passTimelineSection.style.display = displayValue;
     if (deeperStatsToggle) deeperStatsToggle.textContent = isVisible ? 'Hide deeper stats' : 'Reveal deeper stats';
 
     const sidebarDeeperToggle = $('sidebarDeeperToggle');
@@ -469,6 +482,89 @@ document.addEventListener('DOMContentLoaded', () => {
   setDeeperStatsVisibility(false);
 
   initializeSectionShareButtons();
+
+  const passTimelineButtons = Array.from(document.querySelectorAll('[data-pass-button="true"]'));
+  const passTimelinePromptText = $('passTimelinePromptText');
+  const passTimelinePriceText = $('passTimelinePriceText');
+  const passTimelineExtraText = $('passTimelineExtraText');
+  const passTimelineSavingsText = $('passTimelineSavingsText');
+
+  function formatMonthFromKey(monthKey) {
+    if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey)) {
+      return 'selected month';
+    }
+    const parts = monthKey.split('-');
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    const dateObj = new Date(year, month - 1, 1);
+    if (Number.isNaN(dateObj.getTime())) {
+      return monthKey;
+    }
+    return dateObj.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  }
+
+  function formatDayFromKey(dayKey) {
+    if (!dayKey || !/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) {
+      return 'selected day';
+    }
+    const parts = dayKey.split('-');
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    const day = Number(parts[2]);
+    const dateObj = new Date(year, month - 1, day);
+    if (Number.isNaN(dateObj.getTime())) {
+      return dayKey;
+    }
+    return dateObj.toLocaleDateString(undefined, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }
+
+  if (passTimelineButtons.length) {
+    passTimelineButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        passTimelineButtons.forEach((otherButton) => {
+          otherButton.classList.toggle('active', otherButton === button);
+        });
+
+        if (passTimelinePromptText) passTimelinePromptText.style.display = 'none';
+        if (passTimelinePriceText) passTimelinePriceText.style.display = '';
+        if (passTimelineExtraText) passTimelineExtraText.style.display = '';
+        if (passTimelineSavingsText) passTimelineSavingsText.style.display = '';
+
+        if (passTimelinePriceText) {
+          const label = button.getAttribute('data-pass-label') || button.textContent?.trim() || 'selected pass';
+          const price = Number(button.getAttribute('data-pass-price'));
+          const displayPrice = Number.isFinite(price) ? price.toFixed(2) : '0.00';
+          passTimelinePriceText.innerHTML = `Price of ${label} = <span class="pass-price-amount">$${displayPrice}</span>`;
+        }
+
+        if (passTimelineExtraText) {
+          const periodType = button.getAttribute('data-pass-period-type') || 'month';
+          const periodKey = button.getAttribute('data-pass-period-key') || '';
+          const periodLabel = periodType === 'day'
+            ? formatDayFromKey(periodKey)
+            : formatMonthFromKey(periodKey);
+          const extraValue = Number(button.getAttribute('data-pass-extra'));
+          const displayExtra = Number.isFinite(extraValue) ? extraValue.toFixed(2) : '0.00';
+          passTimelineExtraText.innerHTML = `Extra money spent if stored value = <span class="pass-price-amount">$${displayExtra}</span>`;
+
+          if (passTimelineSavingsText) {
+            const priceValue = Number(button.getAttribute('data-pass-price'));
+            const safePrice = Number.isFinite(priceValue) ? priceValue : 0;
+            const safeExtra = Number.isFinite(extraValue) ? extraValue : 0;
+            const savings = safeExtra - safePrice;
+            const savingsClass = savings > 0 ? 'pass-savings-amount-positive' : 'pass-price-amount';
+            const displaySavings = savings.toFixed(2);
+            passTimelineSavingsText.innerHTML = `Money saved = <span class="${savingsClass}">$${displaySavings}</span>`;
+          }
+        }
+      });
+    });
+  }
 
   // ========== END DEEPER STATS TOGGLE ==========
 
@@ -1884,11 +1980,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const date = new Date(startDate.getTime());
         date.setDate(startDate.getDate() + dayIndex);
 
-        if (balanceGranularity === 'week') {
-          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
-
-        return date.toLocaleDateString('en-US', { month: 'short' });
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       };
 
       const buildAxisTickValues = () => {
@@ -1912,20 +2004,50 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
 
-        const lastIndex = balanceTimelineDays - 1;
-        if (lastIndex >= 0 && !values.includes(lastIndex)) {
-          values.push(lastIndex);
-        }
-
         return values;
       };
+
+      const buildBalanceLinePoints = () => {
+        const points = balanceChangePoints
+          .map((point) => ({
+            x: Number(point.x),
+            y: Number(point.y),
+            date: point.date || ''
+          }))
+          .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+          .sort((left, right) => left.x - right.x);
+
+        const lastTimelineIndex = balanceTimelineDays > 0 ? balanceTimelineDays - 1 : null;
+        if (!Number.isFinite(lastTimelineIndex) || lastTimelineIndex < 0) {
+          return points;
+        }
+
+        if (!points.length) {
+          const fallbackValue = balanceValues.find((value) => Number.isFinite(Number(value)));
+          if (!Number.isFinite(Number(fallbackValue))) {
+            return [];
+          }
+
+          const yValue = Number(fallbackValue);
+          return [{ x: 0, y: yValue }, { x: lastTimelineIndex, y: yValue }];
+        }
+
+        const lastPoint = points[points.length - 1];
+        if (lastTimelineIndex > lastPoint.x) {
+          points.push({ x: lastTimelineIndex, y: lastPoint.y });
+        }
+
+        return points;
+      };
+
+      const balanceLinePoints = buildBalanceLinePoints();
 
       balanceChartInstance = new Chart(balanceCanvas.getContext('2d'), {
         type: 'line',
         data: {
           datasets: [{
             label: `Balance by ${balanceGranularity}`,
-            data: balanceChangePoints.map((point) => ({ x: Number(point.x), y: Number(point.y) })).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+            data: balanceLinePoints,
             borderColor: '#009cde',
             backgroundColor: '#009cde',
             borderWidth: 3,
@@ -2010,6 +2132,7 @@ document.addEventListener('DOMContentLoaded', () => {
               ticks: {
                 values: buildAxisTickValues(),
                 callback: (value) => formatTimelineLabel(Number(value)),
+                autoSkip: false,
                 font: { size: chartFontSize },
                 maxRotation: 0,
                 minRotation: 0

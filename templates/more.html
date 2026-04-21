@@ -132,6 +132,13 @@
 
     <a href="/" class="button-card button-small">&laquo; Back to Home / Upload Page</a>
 
+    <div id="loadingOverlay" class="loading-overlay" aria-live="polite" aria-hidden="true">
+        <div class="loading-overlay-content" role="status">
+            <div class="loading-overlay-spinner" aria-hidden="true"></div>
+            <p id="loadingOverlayText" class="loading-overlay-text">Revealing Your Compass Wrapped</p>
+        </div>
+    </div>
+
     <script>
         const multiCsvForm = document.getElementById("multi-csv-form");
         const multiCsvInput = document.getElementById("multi-csv-input");
@@ -142,8 +149,24 @@
         const multiCsvList = document.getElementById("multi-csv-list");
         const slideshowFileInput = document.getElementById("slideshow-file-input");
         const slideshowSelectedFile = document.getElementById("slideshow-selected-file");
+        const slideshowUploadForm = document.getElementById("slideshow-upload-form");
+        const loadingOverlay = document.getElementById("loadingOverlay");
+        const loadingOverlayText = document.getElementById("loadingOverlayText");
 
         let selectedFiles = [];
+
+        function showLoadingOverlay(message) {
+            if (!loadingOverlay || !loadingOverlayText) return;
+            loadingOverlayText.textContent = message;
+            loadingOverlay.classList.add("is-visible");
+            loadingOverlay.setAttribute("aria-hidden", "false");
+        }
+
+        function hideLoadingOverlay() {
+            if (!loadingOverlay) return;
+            loadingOverlay.classList.remove("is-visible");
+            loadingOverlay.setAttribute("aria-hidden", "true");
+        }
 
         function fileKey(file) {
             return `${file.name}__${file.size}__${file.lastModified}`;
@@ -263,6 +286,7 @@
             }
 
             syncInputFiles();
+            showLoadingOverlay("Revealing Your Compass Wrapped");
         });
 
         if (slideshowFileInput && slideshowSelectedFile) {
@@ -272,6 +296,17 @@
             updateSelectedFileName(slideshowFileInput, slideshowSelectedFile, "No file selected.");
         }
 
+        if (slideshowUploadForm) {
+            slideshowUploadForm.addEventListener("submit", () => {
+                showLoadingOverlay("Revealing Your Compass Slideshow");
+            });
+        }
+
+        window.addEventListener("pageshow", () => {
+            hideLoadingOverlay();
+        });
+
+        hideLoadingOverlay();
         renderSelectedFiles();
     </script>
 </body>

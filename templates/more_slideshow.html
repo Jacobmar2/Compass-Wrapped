@@ -39,8 +39,12 @@
         .slideshow-title {
             margin: 0 0 12px 0;
             text-align: left;
-            font-size: 1.7rem;
+            font-size: clamp(1.25rem, 5.8vw, 1.7rem);
             letter-spacing: 0.02em;
+            line-height: 1.1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .slideshow-controls {

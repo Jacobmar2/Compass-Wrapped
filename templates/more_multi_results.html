@@ -546,9 +546,28 @@
             return truncateCsvLabel(label);
         }
 
+        const axisTooltipState = new WeakMap();
+
+        function getAxisTooltipState(chart) {
+            let state = axisTooltipState.get(chart);
+            if (!state) {
+                state = { active: false, index: -1, axis: "" };
+                axisTooltipState.set(chart, state);
+            }
+            return state;
+        }
+
         function clearStationLabelTooltip(chart) {
+            const state = getAxisTooltipState(chart);
+            if (!state.active) {
+                return;
+            }
+
             chart.setActiveElements([]);
             chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+            state.active = false;
+            state.index = -1;
+            state.axis = "";
             chart.update("none");
         }
 
@@ -586,6 +605,8 @@
             if (!xScale || !chartArea) {
                 return;
             }
+
+            const state = getAxisTooltipState(chart);
 
             const chartEvent = normalizeInteractionEvent(chart, nativeEvent);
             const barHits = chart.getElementsAtEventForMode(chartEvent, "nearest", { intersect: true }, false);
@@ -626,12 +647,19 @@
                 return;
             }
 
+            if (state.active && state.axis === "x" && state.index === closestIndex) {
+                return;
+            }
+
             const active = chart.data.datasets.map((_, datasetIndex) => ({ datasetIndex, index: closestIndex }));
             chart.setActiveElements(active);
             chart.tooltip.setActiveElements(active, {
                 x: xScale.getPixelForTick(closestIndex),
                 y: chartArea.bottom - 8,
             });
+            state.active = true;
+            state.index = closestIndex;
+            state.axis = "x";
             chart.update("none");
         }
 
@@ -641,6 +669,8 @@
             if (!yScale || !chartArea) {
                 return;
             }
+
+            const state = getAxisTooltipState(chart);
 
             const chartEvent = normalizeInteractionEvent(chart, nativeEvent);
             const barHits = chart.getElementsAtEventForMode(chartEvent, "nearest", { intersect: true }, false);
@@ -681,12 +711,19 @@
                 return;
             }
 
+            if (state.active && state.axis === "y" && state.index === closestIndex) {
+                return;
+            }
+
             const active = chart.data.datasets.map((_, datasetIndex) => ({ datasetIndex, index: closestIndex }));
             chart.setActiveElements(active);
             chart.tooltip.setActiveElements(active, {
                 x: chartArea.left + 8,
                 y: yScale.getPixelForTick(closestIndex),
             });
+            state.active = true;
+            state.index = closestIndex;
+            state.axis = "y";
             chart.update("none");
         }
 

@@ -550,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : formatMonthFromKey(periodKey);
           const extraValue = Number(button.getAttribute('data-pass-extra'));
           const displayExtra = Number.isFinite(extraValue) ? extraValue.toFixed(2) : '0.00';
-          passTimelineExtraText.innerHTML = `Extra money spent if stored value = <span class="pass-price-amount">$${displayExtra}</span>`;
+          passTimelineExtraText.innerHTML = `Money spent if stored value = <span class="pass-price-amount">$${displayExtra}</span>`;
 
           if (passTimelineSavingsText) {
             const priceValue = Number(button.getAttribute('data-pass-price'));
@@ -647,7 +647,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isEdgeSwipeExcludedTarget = (target) => {
       if (!(target instanceof Element)) return false;
       if (target.closest('.carousel-viewport')) return true;
-      if (target.closest('#section-transit-map, #section-awards')) return true;
+      if (target.closest('#section-transit-map, #section-awards, #skytrainSegmentsSection, #skytrainSegmentsMap')) return true;
       if (target.closest('button, a, input, select, textarea, label')) return true;
       return false;
     };

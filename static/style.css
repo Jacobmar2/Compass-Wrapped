@@ -59,6 +59,16 @@ body {
     to { transform: rotate(360deg); }
 }
 
+@media (max-width: 768px) {
+    .loading-overlay {
+        --loading-overlay-x-offset: 0px;
+    }
+
+    .loading-overlay-content {
+        transform: translateX(0);
+    }
+}
+
 
 
 .card2, .card {
@@ -1166,6 +1176,7 @@ html {
 .pass-timeline-btn {
     margin: 0;
     color: #ffffff;
+    font-weight: 700;
 }
 
 #passTimelineSection h2 {

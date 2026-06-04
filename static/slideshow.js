@@ -22,6 +22,7 @@
   const actionEl = document.getElementById('slideshowAction');
   const sinceEl = document.getElementById('slideshowSince');
   const warningEl = document.getElementById('slideshowWarning');
+  const mapTimestampEl = document.getElementById('slideshowMapTimestamp');
 
   if (!allSteps.length || !mapEl || !sliderEl || !prevEl || !nextEl || !window.L) {
     return;
@@ -462,6 +463,10 @@
       if (sinceEl) sinceEl.textContent = '';
       warningEl.textContent = '';
       warningEl.classList.add('hidden');
+      if (mapTimestampEl) {
+        mapTimestampEl.textContent = '';
+        mapTimestampEl.classList.add('hidden');
+      }
       prevEl.disabled = true;
       nextEl.disabled = true;
       return;
@@ -776,6 +781,16 @@
     actionEl.textContent = stepLabel + timestamp;
     if (sinceEl) {
       sinceEl.textContent = formatSinceText(index);
+    }
+
+    if (mapTimestampEl) {
+      if (currentStep && currentStep.timestamp) {
+        mapTimestampEl.textContent = currentStep.timestamp;
+        mapTimestampEl.classList.remove('hidden');
+      } else {
+        mapTimestampEl.textContent = '';
+        mapTimestampEl.classList.add('hidden');
+      }
     }
 
     updateWarning(currentStep);

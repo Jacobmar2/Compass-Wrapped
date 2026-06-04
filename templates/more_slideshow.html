@@ -388,7 +388,7 @@
         }
 
         .slideshow-back .button-card {
-            margin: 0;
+            margin: 0 auto;
             padding: 18px 18px;
             font-size: 1rem;
             line-height: 1.15;
@@ -426,6 +426,27 @@
 
             .slideshow-controls button {
                 min-width: 48px;
+            }
+
+            .slideshow-calendar-panel {
+                padding-bottom: 8px;
+            }
+
+            .slideshow-calendar-clear,
+            .slideshow-calendar-custom {
+                float: left;
+                width: calc(50% - 6px);
+                margin-top: 10px;
+            }
+
+            .slideshow-calendar-clear {
+                margin-right: 12px;
+            }
+
+            .slideshow-calendar-range-status {
+                clear: both;
+                margin-top: 4px;
+                min-height: 0;
             }
         }
     </style>

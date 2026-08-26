@@ -1251,7 +1251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(segmentsMap);
 
-      fetch('/static/data/SkyTrain%20segments%20map-%20segments.csv', {
+      fetch('/static/data/skytrain_segments.csv', {
         cache: 'no-store'
       })
         .then((response) => {

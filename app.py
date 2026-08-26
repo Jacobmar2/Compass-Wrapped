@@ -17,12 +17,14 @@ app.config["UPLOAD_FOLDER"] = "/tmp/uploads"
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 ALLOWED_EXTENSIONS = {".csv"}
 MAX_CSV_ROWS = 150000
 TIMESTAMP_FORMAT = "%b-%d-%Y %I:%M %p"
 
 WCE_TERMINAL_STATION_KEYS = {"waterfront", "moody center"}
-SEGMENTS_CSV_PATH = os.path.join("static", "data", "SkyTrain segments map- segments.csv")
+SEGMENTS_CSV_PATH = os.path.join(BASE_DIR, "static", "data", "skytrain_segments.csv")
 
 
 def _normalize_graph_station_name(name):

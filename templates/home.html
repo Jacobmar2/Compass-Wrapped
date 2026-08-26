@@ -28,7 +28,7 @@
         <form method="POST" enctype="multipart/form-data" class="home-upload-form">
             <div class="file-picker">
                 <input id="homeFileInput" class="file-picker-input" type="file" name="file" accept=".csv" required>
-                <label for="homeFileInput" class="file-picker-shell" aria-label="Choose CSV file">
+                <label id="homeFilePickerShell" for="homeFileInput" class="file-picker-shell" aria-label="Choose CSV file">
                     <span class="file-picker-button">Browse...</span>
                     <span id="homeSelectedFileName" class="file-picker-name is-empty">No file selected.</span>
                 </label>
@@ -70,6 +70,7 @@
     <script>
         const homeUploadForm = document.querySelector(".home-upload-form");
         const homeFileInput = document.getElementById("homeFileInput");
+        const homeFilePickerShell = document.getElementById("homeFilePickerShell");
         const homeSelectedFileName = document.getElementById("homeSelectedFileName");
         const loadingOverlay = document.getElementById("loadingOverlay");
         const loadingOverlayText = document.getElementById("loadingOverlayText");
@@ -88,11 +89,50 @@
             output.classList.toggle("is-empty", !selectedFile);
         }
 
+        function handleDroppedFiles(event, input, output, emptyText) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const droppedFiles = Array.from(event.dataTransfer?.files || []);
+            const csvFiles = droppedFiles.filter((file) => file.name.toLowerCase().endsWith(".csv"));
+
+            if (!csvFiles.length) {
+                return;
+            }
+
+            const dataTransfer = new DataTransfer();
+            csvFiles.forEach((file) => dataTransfer.items.add(file));
+            input.files = dataTransfer.files;
+            updateSelectedFileName(input, output, emptyText);
+        }
+
         if (homeFileInput && homeSelectedFileName) {
             homeFileInput.addEventListener("change", () => {
                 updateSelectedFileName(homeFileInput, homeSelectedFileName, "No file selected.");
             });
             updateSelectedFileName(homeFileInput, homeSelectedFileName, "No file selected.");
+        }
+
+        if (homeFilePickerShell && homeFileInput && homeSelectedFileName) {
+            ["dragenter", "dragover"].forEach((eventName) => {
+                homeFilePickerShell.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    homeFilePickerShell.classList.add("is-drag-active");
+                });
+            });
+
+            ["dragleave", "drop"].forEach((eventName) => {
+                homeFilePickerShell.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    homeFilePickerShell.classList.remove("is-drag-active");
+                });
+            });
+
+            homeFilePickerShell.addEventListener("drop", (event) => {
+                handleDroppedFiles(event, homeFileInput, homeSelectedFileName, "No file selected.");
+            });
         }
 
         if (homeUploadForm) {

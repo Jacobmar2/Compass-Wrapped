@@ -121,7 +121,7 @@
         <form id="slideshow-upload-form" method="POST" action="/more/upload-slideshow" enctype="multipart/form-data">
             <div class="file-picker">
                 <input id="slideshow-file-input" class="file-picker-input" type="file" name="file" accept=".csv" required>
-                <label for="slideshow-file-input" class="file-picker-shell" aria-label="Choose slideshow CSV file">
+                <label id="slideshowFilePickerShell" for="slideshow-file-input" class="file-picker-shell" aria-label="Choose slideshow CSV file">
                     <span class="file-picker-button">Browse...</span>
                     <span id="slideshow-selected-file" class="file-picker-name is-empty">No file selected.</span>
                 </label>
@@ -148,6 +148,7 @@
         const multiCsvSelected = document.getElementById("multi-csv-selected");
         const multiCsvList = document.getElementById("multi-csv-list");
         const slideshowFileInput = document.getElementById("slideshow-file-input");
+        const slideshowFilePickerShell = document.getElementById("slideshowFilePickerShell");
         const slideshowSelectedFile = document.getElementById("slideshow-selected-file");
         const slideshowUploadForm = document.getElementById("slideshow-upload-form");
         const loadingOverlay = document.getElementById("loadingOverlay");
@@ -294,6 +295,38 @@
                 updateSelectedFileName(slideshowFileInput, slideshowSelectedFile, "No file selected.");
             });
             updateSelectedFileName(slideshowFileInput, slideshowSelectedFile, "No file selected.");
+        }
+
+        if (slideshowFilePickerShell && slideshowFileInput && slideshowSelectedFile) {
+            ["dragenter", "dragover"].forEach((eventName) => {
+                slideshowFilePickerShell.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    slideshowFilePickerShell.classList.add("is-drag-active");
+                });
+            });
+
+            ["dragleave", "drop"].forEach((eventName) => {
+                slideshowFilePickerShell.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    slideshowFilePickerShell.classList.remove("is-drag-active");
+                });
+            });
+
+            slideshowFilePickerShell.addEventListener("drop", (event) => {
+                const droppedFiles = Array.from(event.dataTransfer?.files || []);
+                const csvFiles = droppedFiles.filter((file) => file.name.toLowerCase().endsWith(".csv"));
+
+                if (!csvFiles.length) {
+                    return;
+                }
+
+                const dataTransfer = new DataTransfer();
+                csvFiles.forEach((file) => dataTransfer.items.add(file));
+                slideshowFileInput.files = dataTransfer.files;
+                updateSelectedFileName(slideshowFileInput, slideshowSelectedFile, "No file selected.");
+            });
         }
 
         if (slideshowUploadForm) {

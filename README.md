@@ -1,6 +1,6 @@
 # Compass-Wrapped
 
-Live Project: [https://compass-wrapped.onrender.com/](https://compass-wrapped.onrender.com/)
+Live Project: https://compass-wrapped-tau.vercel.app/
 
 ## What is Compass Wrapped?
  A “Spotify Wrapped” style transit ridership stats generator for Compass Card data

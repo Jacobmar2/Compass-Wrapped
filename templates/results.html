@@ -38,6 +38,7 @@
 
     <div class="results-card-2" id="section-summary">
 
+        {% if demoMode %}<p class="sub">Demo results · static sample data</p>{% endif %}
         <h1>You have taken a total of 
             <span class="yellow">{{ TripsNum }}</span> trips!
         </h1>
@@ -61,7 +62,8 @@
         </p>
 
         <h2>
-            Minutes spent on SkyTrain/SeaBus/WCE: <span class="yellow">{{ minutes }}</span> 
+            Time spent on SkyTrain/SeaBus/WCE: <span class="yellow">{{ duration_days }} {{ 'day' if duration_days == 1 else 'days' }}, 
+                {{ duration_hours }} {{ 'hour' if duration_hours == 1 else 'hours' }}, {{ duration_minutes }} {{ 'min' if duration_minutes == 1 else 'mins' }}</span>
         </h2>
 
         <button
@@ -271,6 +273,7 @@
 
     <div class="results-card" id="section-bus-stops">
         <h2>Your Top Bus Stops</h2>
+        {% if demoMode %}<p class="map-subtitle">100 distinct bus stops in this sample.</p>{% endif %}
         {% if top10BusStops %}
         <ul>
             {% for stop_name, stop_id, count in top10BusStops %}
@@ -513,8 +516,8 @@
 
 
     <!-- ⭐ BACK BUTTON -->
-    <a href="/" class="button-card back-button">
-        &laquo; Upload Another File
+    <a href="{{ url_for('upload_file') }}" class="button-card back-button">
+        {% if demoMode %}&laquo; Back to Upload{% else %}&laquo; Upload Another File{% endif %}
     </a>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

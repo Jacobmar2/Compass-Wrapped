@@ -161,7 +161,7 @@
     sliderEl.classList.toggle('single-tap', steps.length === 1);
   }
 
-  function parseCompassTimestamp(text) {
+  function parseCompassTimestampParts(text) {
     const value = String(text || '').trim();
     const match = value.match(/^([A-Za-z]{3})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})\s+(AM|PM)$/i);
     if (!match) return null;
@@ -183,7 +183,27 @@
     if (period === 'AM' && hour === 12) hour = 0;
     if (period === 'PM' && hour !== 12) hour += 12;
 
-    return new Date(year, month, day, hour, minute, 0, 0);
+    return { year, month, day, hour, minute };
+  }
+
+  function parseCompassTimestamp(text) {
+    const parts = parseCompassTimestampParts(text);
+    if (!parts) return null;
+    return new Date(parts.year, parts.month, parts.day, parts.hour, parts.minute, 0, 0);
+  }
+
+  const BC_PERMANENT_DAYLIGHT_START = Date.UTC(2026, 10, 1);
+
+  function parseCompassTimestampForTheme(text) {
+    const parts = parseCompassTimestampParts(text);
+    if (!parts) return null;
+
+    const wallClockUtc = Date.UTC(parts.year, parts.month, parts.day, parts.hour, parts.minute);
+    if (wallClockUtc < BC_PERMANENT_DAYLIGHT_START) {
+      return new Date(parts.year, parts.month, parts.day, parts.hour, parts.minute, 0, 0);
+    }
+
+    return new Date(wallClockUtc + 7 * 60 * 60 * 1000);
   }
 
   function formatDayKey(dateObj) {
@@ -644,7 +664,7 @@
       return;
     }
 
-    const currentDate = parseCompassTimestamp(currentStep && currentStep.timestamp);
+    const currentDate = parseCompassTimestampForTheme(currentStep && currentStep.timestamp);
     if (!currentDate || Number.isNaN(currentDate.getTime())) {
       applyMapTheme('light');
       return;

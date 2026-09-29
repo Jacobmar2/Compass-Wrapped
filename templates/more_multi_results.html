@@ -342,7 +342,7 @@
         <div class="carousel-viewport">
             <div class="carousel" id="morePieCarouselTrack">
                 <div class="slide">
-                    <h2>Total Trips by CSV</h2>
+                    <h2>Total Trips by File</h2>
                     <div class="chart-wrapper" style="height: 520px;">
                         <canvas id="morePieTotalTrips"></canvas>
                         <p id="morePieTotalTripsEmpty" class="pie-empty-message">No trips have been found in any of the uploaded files.</p>
@@ -350,7 +350,7 @@
                 </div>
 
                 <div class="slide">
-                    <h2>Bus Only Trips by CSV</h2>
+                    <h2>Bus Only Trips by File</h2>
                     <div class="chart-wrapper" style="height: 520px;">
                         <canvas id="morePieBusOnly"></canvas>
                         <p id="morePieBusOnlyEmpty" class="pie-empty-message">No bus-only trips have been found in any of the uploaded files.</p>
@@ -358,7 +358,7 @@
                 </div>
 
                 <div class="slide">
-                    <h2>SkyTrain Trips by CSV</h2>
+                    <h2>SkyTrain Trips by File</h2>
                     <div class="chart-wrapper" style="height: 520px;">
                         <canvas id="morePieSkytrain"></canvas>
                         <p id="morePieSkytrainEmpty" class="pie-empty-message">No SkyTrain trips have been found in any of the uploaded files.</p>
@@ -366,7 +366,7 @@
                 </div>
 
                 <div class="slide">
-                    <h2>SeaBus Trips by CSV</h2>
+                    <h2>SeaBus Trips by File</h2>
                     <div class="chart-wrapper" style="height: 520px;">
                         <canvas id="morePieSeabus"></canvas>
                         <p id="morePieSeabusEmpty" class="pie-empty-message">No SeaBus trips have been found in any of the uploaded files.</p>
@@ -374,7 +374,7 @@
                 </div>
 
                 <div class="slide">
-                    <h2>WCE Trips by CSV</h2>
+                    <h2>WCE Trips by File</h2>
                     <div class="chart-wrapper" style="height: 520px;">
                         <canvas id="morePieWce"></canvas>
                         <p id="morePieWceEmpty" class="pie-empty-message">No WCE trips have been found in any of the uploaded files.</p>
@@ -396,24 +396,24 @@
     </div>
 
     <div class="card compare-card" id="section-compare">
-        <h2>Compare CSV Files</h2>
-        <p class="sub">Select exactly 2 CSV files to see shared trips (same tap name within 2 minutes).</p>
+        <h2>Compare Files</h2>
+        <p class="sub">Select exactly 2 files to see shared trips (same tap name within 2 minutes).</p>
         <div id="compareCsvButtons" class="compare-csv-buttons"></div>
         <button id="compareResetBtn" class="compare-reset-btn" type="button">Clear Selection</button>
         <p id="compareSelectionStatus" class="sub"></p>
 
         <div id="sharedTripsDetails" class="shared-trips-details">
-            <p id="sharedTripsSummary" class="shared-trips-title">Shared trips table will appear after selecting 2 CSV files.</p>
+            <p id="sharedTripsSummary" class="shared-trips-title">Shared trips table will appear after selecting 2 files.</p>
             <div class="shared-trips-table-wrap">
                 <table class="shared-trips-table">
                     <thead>
                         <tr>
-                            <th>CSV A Station</th>
-                            <th>CSV B Station</th>
-                            <th>CSV A Tap</th>
-                            <th>CSV B Tap</th>
-                            <th>CSV A Timestamp</th>
-                            <th>CSV B Timestamp</th>
+                            <th>File A Station</th>
+                            <th>File B Station</th>
+                            <th>File A Tap</th>
+                            <th>File B Tap</th>
+                            <th>File A Timestamp</th>
+                            <th>File B Timestamp</th>
                             <th>Difference (min)</th>
                             <th>Match Type</th>
                         </tr>
@@ -424,10 +424,10 @@
         </div>
 
         <button id="downloadSharedCsvABtn" class="compare-reset-btn" type="button" style="display: none;">
-            Download Matching Taps CSV (CSV A)
+            Download Matching Taps CSV (File A)
         </button>
         <button id="downloadSharedCsvBBtn" class="compare-reset-btn" type="button" style="display: none; margin-left: 8px;">
-            Download Matching Taps CSV (CSV B)
+            Download Matching Taps CSV (File B)
         </button>
         <button id="downloadSharedCsvExactBtn" class="compare-reset-btn" type="button" style="display: none; margin-left: 8px;">
             Download Exact Trips CSV
@@ -458,12 +458,12 @@
 
     <div class="results-card map-card" id="sharedStationsMapCard" style="display: none;">
         <h2>Shared Stations Map</h2>
-        <p class="map-subtitle" id="sharedStationsMapSubtitle">Stations visited by CSV A and CSV B.</p>
+        <p class="map-subtitle" id="sharedStationsMapSubtitle">Stations visited by File A and File B.</p>
         <div class="map-legend">
             <div class="legend-item"><span class="legend-swatch station-shared-trip"></span>Shared trip stations</div>
             <div class="legend-item"><span class="legend-swatch station-shared"></span>Visited by both</div>
-            <div class="legend-item"><span class="legend-swatch station-only-a"></span>Only CSV A</div>
-            <div class="legend-item"><span class="legend-swatch station-only-b"></span>Only CSV B</div>
+            <div class="legend-item"><span class="legend-swatch station-only-a"></span>Only File A</div>
+            <div class="legend-item"><span class="legend-swatch station-only-b"></span>Only File B</div>
             <div class="legend-item"><span class="legend-swatch station-unused"></span>Unused by both</div>
         </div>
         <div id="sharedStationsMap" class="top-stops-map"></div>
@@ -1057,7 +1057,7 @@
 
             const fileA = compareTapData[aIndex];
             const fileB = compareTapData[bIndex];
-            sharedStationsMapSubtitle.textContent = `Station coverage for CSV A (${formatCsvLabelForDisplay(fileA.label)}) vs CSV B (${formatCsvLabelForDisplay(fileB.label)}).`;
+            sharedStationsMapSubtitle.textContent = `Station coverage for File A (${formatCsvLabelForDisplay(fileA.label)}) vs File B (${formatCsvLabelForDisplay(fileB.label)}).`;
 
             const visitedA = new Set(Array.isArray(mapFileStationNames[aIndex]) ? mapFileStationNames[aIndex] : []);
             const visitedB = new Set(Array.isArray(mapFileStationNames[bIndex]) ? mapFileStationNames[bIndex] : []);
@@ -1110,7 +1110,7 @@
                 bounds.push([point.lat, point.lon]);
             });
 
-            sharedStationsMapStatus.textContent = `Shared Trips: ${categoryCounts.sharedTrip} | Both: ${categoryCounts.shared} | Only CSV A: ${categoryCounts.onlyA} | Only CSV B: ${categoryCounts.onlyB} | Unused: ${categoryCounts.unused}`;
+            sharedStationsMapStatus.textContent = `Shared Trips: ${categoryCounts.sharedTrip} | Both: ${categoryCounts.shared} | Only File A: ${categoryCounts.onlyA} | Only File B: ${categoryCounts.onlyB} | Unused: ${categoryCounts.unused}`;
 
             if (bounds.length === 1) {
                 sharedStationsMap.setView(bounds[0], 12);

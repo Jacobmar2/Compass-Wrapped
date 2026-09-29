@@ -5,7 +5,7 @@ import csv
 import uuid
 import utils
 from collections import Counter, OrderedDict
-from datetime import datetime, timedelta, time
+from datetime import date, datetime, timedelta, time
 import calendar
 import re
 import heapq
@@ -1508,16 +1508,19 @@ MONTHLY_FARE_EFFECTIVE_BY_ZONE = {
         (datetime(2023, 7, 1).date(), 104.90),
         (datetime(2024, 7, 1).date(), 107.30),
         (datetime(2025, 7, 1).date(), 111.60),
+        (datetime(2026, 7, 1).date(), 117.20),
     ],
     2: [
         (datetime(2023, 7, 1).date(), 140.25),
         (datetime(2024, 7, 1).date(), 143.50),
         (datetime(2025, 7, 1).date(), 149.25),
+        (datetime(2026, 7, 1).date(), 156.70),
     ],
     3: [
         (datetime(2023, 7, 1).date(), 189.45),
         (datetime(2024, 7, 1).date(), 193.80),
         (datetime(2025, 7, 1).date(), 201.55),
+        (datetime(2026, 7, 1).date(), 211.65),
     ],
 }
 
@@ -1525,12 +1528,17 @@ DAYPASS_FARE_EFFECTIVE = [
     (datetime(2023, 7, 1).date(), 11.25),
     (datetime(2024, 7, 1).date(), 11.50),
     (datetime(2025, 7, 1).date(), 11.95),
+    (datetime(2026, 7, 1).date(), 12.55),
 ]
 
 UPASS_FARE_EFFECTIVE = [
     (datetime(2023, 5, 1).date(), 45.10),
     (datetime(2024, 5, 1).date(), 46.00),
     (datetime(2025, 9, 1).date(), 46.90),
+    (datetime(2026, 9, 1).date(), 47.85),
+    (datetime(2027, 9, 1).date(), 48.80),
+    (datetime(2028, 9, 1).date(), 49.80),
+    (datetime(2029, 9, 1).date(), 50.80),
 ]
 
 COMPASS_FARE_EFFECTIVE_BY_ZONE = {
@@ -1538,20 +1546,26 @@ COMPASS_FARE_EFFECTIVE_BY_ZONE = {
         (datetime(2023, 7, 1).date(), 2.55),
         (datetime(2024, 7, 1).date(), 2.60),
         (datetime(2025, 7, 1).date(), 2.70),
+        (datetime(2026, 7, 1).date(), 2.85),
     ],
     2: [
         (datetime(2023, 7, 1).date(), 3.75),
         (datetime(2024, 7, 1).date(), 3.85),
         (datetime(2025, 7, 1).date(), 4.00),
+        (datetime(2026, 7, 1).date(), 4.20),
     ],
     3: [
         (datetime(2023, 7, 1).date(), 4.80),
         (datetime(2024, 7, 1).date(), 4.90),
         (datetime(2025, 7, 1).date(), 5.10),
+        (datetime(2026, 7, 1).date(), 5.40),
     ],
 }
 
-AIRPORT_ADD_FARE = 5.00
+AIRPORT_ADD_FARE_EFFECTIVE = [
+    (datetime(2023, 7, 1).date(), 5.00),
+    (datetime(2026, 7, 1).date(), 6.50),
+]
 
 ZONE_1_STATIONS = {
     "Waterfront Stn", "Burrard Stn", "Granville Stn", "Stadium Stn", "Main Street Stn",
@@ -1688,6 +1702,51 @@ def build_trip_blocks(rows):
     return blocks
 
 
+def is_translink_statutory_holiday(target_date):
+    year = target_date.year
+
+    first_monday_february = date(year, 2, 1) + timedelta(days=(7 - date(year, 2, 1).weekday()) % 7)
+    family_day = first_monday_february + timedelta(days=14)
+    victoria_day = date(year, 5, 24) - timedelta(days=date(year, 5, 24).weekday())
+    first_monday_august = date(year, 8, 1) + timedelta(days=(7 - date(year, 8, 1).weekday()) % 7)
+    first_monday_september = date(year, 9, 1) + timedelta(days=(7 - date(year, 9, 1).weekday()) % 7)
+    first_monday_october = date(year, 10, 1) + timedelta(days=(7 - date(year, 10, 1).weekday()) % 7)
+    thanksgiving = first_monday_october + timedelta(days=7)
+
+    lunar_cycle = year % 19
+    century = year // 100
+    year_in_century = year % 100
+    century_correction = century // 4
+    century_remainder = century % 4
+    leap_year_correction = year_in_century // 4
+    year_remainder = year_in_century % 4
+    lunar_correction = (century + 8) // 25
+    century_lunar_correction = (century - lunar_correction + 1) // 3
+    epact = (19 * lunar_cycle + century - century_correction - century_lunar_correction + 15) % 30
+    weekday_correction = (
+        32 + 2 * century_remainder + 2 * leap_year_correction - epact - year_remainder
+    ) % 7
+    easter_offset = (lunar_cycle + 11 * epact + 22 * weekday_correction) // 451
+    easter_month = (epact + weekday_correction - 7 * easter_offset + 114) // 31
+    easter_day = (epact + weekday_correction - 7 * easter_offset + 114) % 31 + 1
+    good_friday = date(year, easter_month, easter_day) - timedelta(days=2)
+
+    return target_date in {
+        date(year, 1, 1),
+        family_day,
+        good_friday,
+        victoria_day,
+        date(year, 7, 1),
+        first_monday_august,
+        first_monday_september,
+        date(year, 9, 30),
+        thanksgiving,
+        date(year, 11, 11),
+        date(year, 12, 25),
+        date(year, 12, 26),
+    }
+
+
 def simulated_stored_value_fare_for_block(block, travel_date):
     if not block:
         return 0.0
@@ -1707,7 +1766,8 @@ def simulated_stored_value_fare_for_block(block, travel_date):
     if start_dt:
         starts_after_evening_cutoff = start_dt.time() > time(18, 30)
         starts_on_weekend = start_dt.weekday() >= 5
-        one_zone_override = starts_after_evening_cutoff or starts_on_weekend
+        starts_on_holiday = is_translink_statutory_holiday(start_dt.date())
+        one_zone_override = starts_after_evening_cutoff or starts_on_weekend or starts_on_holiday
 
     airport_only = bool(zone_keys) and zone_keys == {"airport"} and not has_bus
     if one_zone_override:
@@ -1730,7 +1790,7 @@ def simulated_stored_value_fare_for_block(block, travel_date):
         None,
     )
     if first_station_tap_in and station_zone_key(first_station_tap_in["station"]) == "airport" and not airport_only:
-        add_fare = AIRPORT_ADD_FARE
+        add_fare = fare_for_date(AIRPORT_ADD_FARE_EFFECTIVE, travel_date)
 
     return round(base_fare + add_fare, 2)
 
@@ -1744,12 +1804,11 @@ def period_balance_spent(filtered_rows):
     bottom_balance = next((row["balance"] for row in sorted_rows if row["balance"] is not None), None)
 
     topups = 0.0
-    bottom_index = len(sorted_rows) - 1
     for index, row in enumerate(sorted_rows):
         action_lower = str(row["action"]).strip().lower()
         if not (action_lower.startswith("loaded at") or action_lower.startswith("purchase at")):
             continue
-        if index == bottom_index:
+        if index == 0:
             continue
         amount_value = row["amount"]
         if amount_value is not None and amount_value > 0:
@@ -2801,6 +2860,395 @@ def build_slideshow_steps_from_rows(rows):
     return steps
 
 
+@app.route("/more/demo-slideshow")
+def more_demo_slideshow():
+    anchor = utils.get_station_location("Commercial-Broadway Stn")
+    nearby_bus_stops = []
+    for stop_id, stop_name in utils.busStopNames.items():
+        location = utils.get_bus_stop_location(stop_id)
+        if location:
+            distance = ((location["lat"] - anchor["lat"]) * 111) ** 2
+            distance += ((location["lon"] - anchor["lon"]) * 75) ** 2
+            if distance <= 14 ** 2:
+                nearby_bus_stops.append((stop_id, location))
+
+    demo_bus_stops = []
+    if nearby_bus_stops:
+        first_stop = min(
+            nearby_bus_stops,
+            key=lambda stop: (stop[1]["lat"] - anchor["lat"]) ** 2
+            + (stop[1]["lon"] - anchor["lon"]) ** 2,
+        )
+        demo_bus_stops.append(first_stop[0])
+        remaining_stops = {stop_id: location for stop_id, location in nearby_bus_stops if stop_id != first_stop[0]}
+        nearest_stop_distance = {
+            stop_id: ((location["lat"] - first_stop[1]["lat"]) * 111) ** 2
+            + ((location["lon"] - first_stop[1]["lon"]) * 75) ** 2
+            for stop_id, location in remaining_stops.items()
+        }
+        while remaining_stops and len(demo_bus_stops) < 50:
+            next_stop_id = max(remaining_stops, key=nearest_stop_distance.get)
+            next_location = remaining_stops.pop(next_stop_id)
+            demo_bus_stops.append(next_stop_id)
+            for stop_id, location in remaining_stops.items():
+                nearest_stop_distance[stop_id] = min(
+                    nearest_stop_distance[stop_id],
+                    ((location["lat"] - next_location["lat"]) * 111) ** 2
+                    + ((location["lon"] - next_location["lon"]) * 75) ** 2,
+                )
+
+    station_sequence = [
+        "Waterfront Stn", "Burrard Stn", "Granville Stn", "Stadium Stn",
+        "Commercial-Broadway Stn", "Brentwood Stn", "Holdom Stn", "Metrotown Stn",
+        "New Westminster Stn", "Columbia Stn", "Surrey Central Stn", "Lougheed Stn",
+        "Coquitlam Central Stn", "Inlet Centre Stn", "VCC-Clark Stn", "Renfrew Stn",
+        "Broadway-City Hall Stn", "Vancouver City Centre Stn", "Yaletown-Roundhouse Stn",
+        "Marine Drive Stn", "Brighouse Stn", "Bridgeport Stn",
+    ]
+    station_pairs = list(zip(station_sequence, station_sequence[1:])) + [
+        ("Waterfront Stn", "Lonsdale Quay"),
+        ("Commercial-Broadway Stn", "VCC-Clark Stn"),
+        ("Bridgeport Stn", "Waterfront Stn"),
+    ]
+    active_day_offsets = [offset for offset in range(181) if offset % 9 not in {3, 4}]
+    extra_trip_count = 250 - len(active_day_offsets)
+    doubled_day_indices = [
+        index * (len(active_day_offsets) - 1) // (extra_trip_count - 1)
+        for index in range(extra_trip_count)
+    ]
+    trip_day_offsets = active_day_offsets + [active_day_offsets[index] for index in doubled_day_indices]
+    trip_day_offsets.sort()
+    trips_per_day = {}
+    demo_tap_rows = []
+    bus_trip_index = 0
+    station_trip_index = 0
+
+    for trip_index, day_offset in enumerate(trip_day_offsets):
+        trip_date = date(2025, 1, 1) + timedelta(days=day_offset)
+        day_key = trip_date.isoformat()
+        trip_on_day = trips_per_day.get(day_key, 0)
+        trips_per_day[day_key] = trip_on_day + 1
+        departure = datetime.combine(
+            trip_date,
+            time(7 if trip_on_day == 0 else 16, (trip_index * 7) % 60),
+        )
+        arrival = departure + timedelta(minutes=15 + trip_index % 30)
+
+        if trip_index % 5 == 0 and len(demo_bus_stops) >= 2:
+            start_stop = demo_bus_stops[bus_trip_index % len(demo_bus_stops)]
+            end_stop = demo_bus_stops[(bus_trip_index + 1) % len(demo_bus_stops)]
+            bus_trip_index += 1
+            start_action = f"Tap In at Bus Stop {start_stop}"
+            end_action = f"Tap Out at Bus Stop {end_stop}"
+        else:
+            start_station, end_station = station_pairs[station_trip_index % len(station_pairs)]
+            station_trip_index += 1
+            start_action = f"Tap In at {start_station}"
+            end_action = f"Tap Out at {end_station}"
+
+        demo_tap_rows.extend([
+            [departure.strftime(TIMESTAMP_FORMAT), start_action],
+            [arrival.strftime(TIMESTAMP_FORMAT), end_action],
+        ])
+
+    demo_rows = [["Timestamp", "Action"], *reversed(demo_tap_rows)]
+    return render_template(
+        "more_slideshow.html",
+        selected_name="Compass Slideshow Demo",
+        slideshow_steps=build_slideshow_steps_from_rows(demo_rows),
+    )
+
+
+@app.route("/demo")
+def demo_results():
+    top_station_names = [
+        "Waterfront Stn",
+        "Commercial-Broadway Stn",
+        "Vancouver City Centre Stn",
+        "Metrotown Stn",
+        "Brentwood Stn",
+    ]
+    station_names = list(top_station_names)
+    for station_name in utils.SkyTrainStns:
+        canonical_name = utils.canonicalize_station_name(station_name)
+        if canonical_name not in station_names:
+            station_names.append(canonical_name)
+        if len(station_names) == 20:
+            break
+
+    station_counts = [220, 140, 115, 95, 82, 75, 68, 62, 56, 52, 48, 44, 40, 36, 32, 28, 24, 20, 10, 3]
+    stations = []
+    station_map_points = []
+    for rank, (name, count) in enumerate(zip(station_names[:5], station_counts[:5]), start=1):
+        icon = utils.stationIcons.get(name, "icons/expo")
+        if "expmil" in icon:
+            lines = "Expo & Millennium Line"
+        elif "expcan" in icon:
+            lines = "Expo & Canada Line"
+        elif "millennium" in icon:
+            lines = "Millennium Line"
+        elif "canada" in icon:
+            lines = "Canada Line"
+        else:
+            lines = "Expo Line"
+        stations.append({"rank": rank, "name": name, "lines": lines, "highlight": False, "icon": icon})
+
+    for rank, (name, count) in enumerate(zip(station_names, station_counts), start=1):
+        location = utils.get_station_location(name)
+        if location:
+            station_map_points.append({
+                "rank": rank,
+                "name": name,
+                "count": count,
+                "lat": location["lat"],
+                "lon": location["lon"],
+                "source_name": location["name"],
+                "last_used_display": "Recently",
+            })
+
+    available_bus_stops = []
+    for stop_id, stop_name in sorted(utils.busStopNames.items()):
+        location = utils.get_bus_stop_location(stop_id)
+        if location:
+            available_bus_stops.append((stop_id, stop_name, location))
+
+    def stop_distance_squared(stop_a, stop_b):
+        latitude_km = (stop_a[2]["lat"] - stop_b[2]["lat"]) * 111
+        longitude_km = (stop_a[2]["lon"] - stop_b[2]["lon"]) * 75
+        return latitude_km ** 2 + longitude_km ** 2
+
+    anchor_location = utils.get_station_location("Commercial-Broadway Stn")
+    commercial_broadway_reference = ("", "", anchor_location)
+
+    def select_spread_stops(candidates, target_count):
+        if not candidates or target_count <= 0:
+            return []
+
+        first_stop = min(
+            candidates,
+            key=lambda stop: stop_distance_squared(stop, commercial_broadway_reference),
+        )
+        selected_stops = [first_stop]
+        remaining_stops = {stop[0]: stop for stop in candidates if stop[0] != first_stop[0]}
+        nearest_selected_distance = {
+            stop_id: stop_distance_squared(stop, first_stop)
+            for stop_id, stop in remaining_stops.items()
+        }
+
+        while remaining_stops and len(selected_stops) < target_count:
+            next_stop_id = max(remaining_stops, key=nearest_selected_distance.get)
+            next_stop = remaining_stops.pop(next_stop_id)
+            selected_stops.append(next_stop)
+            for stop_id, stop in remaining_stops.items():
+                nearest_selected_distance[stop_id] = min(
+                    nearest_selected_distance[stop_id],
+                    stop_distance_squared(stop, next_stop),
+                )
+        return selected_stops
+
+    nearby_bus_stops = []
+    midrange_bus_stops = []
+    outer_bus_stops = []
+    for stop in available_bus_stops:
+        distance_squared = stop_distance_squared(stop, commercial_broadway_reference)
+        if distance_squared <= 8 ** 2:
+            nearby_bus_stops.append(stop)
+        elif distance_squared <= 20 ** 2:
+            midrange_bus_stops.append(stop)
+        else:
+            outer_bus_stops.append(stop)
+
+    bus_stop_locations = (
+        select_spread_stops(nearby_bus_stops, 70)
+        + select_spread_stops(midrange_bus_stops, 20)
+        + select_spread_stops(outer_bus_stops, 10)
+    )
+
+    bus_stop_counts = [25, 21, 18, 17, 16, 15, 14, 13, 12, 11] + ([5] * 78) + ([4] * 12)
+    bus_stops = [
+        (stop_name, stop_id, bus_stop_counts[index])
+        for index, (stop_id, stop_name, _location) in enumerate(bus_stop_locations)
+    ]
+    bus_map_points = []
+    for rank, (stop_id, stop_name, location) in enumerate(bus_stop_locations, start=1):
+        bus_map_points.append({
+            "rank": rank,
+            "name": stop_name,
+            "stop_id": stop_id,
+            "count": bus_stop_counts[rank - 1],
+            "lat": location["lat"],
+            "lon": location["lon"],
+            "last_used_display": "Recently",
+        })
+
+    demo_top_station_pairs = [
+        (("Waterfront Stn", "Commercial-Broadway Stn"), 42),
+        (("Waterfront Stn", "Vancouver City Centre Stn"), 31),
+        (("Metrotown Stn", "Waterfront Stn"), 27),
+        (("Commercial-Broadway Stn", "Brentwood Stn"), 24),
+        (("Waterfront Stn", "Brentwood Stn"), 22),
+        (("Commercial-Broadway Stn", "Metrotown Stn"), 20),
+        (("Surrey Central Stn", "Waterfront Stn"), 18),
+        (("Lougheed Stn", "Coquitlam Central Stn"), 17),
+        (("Granville Stn", "New Westminster Stn"), 15),
+        (("Vancouver City Centre Stn", "Yaletown-Roundhouse Stn"), 13),
+    ]
+    demo_pair_counts = Counter()
+    for (left_name, right_name), uses in demo_top_station_pairs:
+        left_station = canonical_graph_station_name(left_name)
+        right_station = canonical_graph_station_name(right_name)
+        if left_station and right_station and left_station != right_station:
+            demo_pair_counts[tuple(sorted((left_station, right_station)))] += uses
+    demo_segment_uses, demo_segment_minutes, _ = build_segment_usage_from_pairs(demo_pair_counts)
+    demo_skytrain_segment_usage = build_segment_usage_by_csv_name(demo_segment_uses, demo_segment_minutes)
+
+    pass_timeline_entries = [
+        {"label": "1 Zone Monthly Pass - Jan", "price": 107.30, "period_type": "month", "period_key": "2025-01", "timestamp": "Jan-01-2025 12:00 AM"},
+        {"label": "2 Zone Monthly Pass - Feb", "price": 143.50, "period_type": "month", "period_key": "2025-02", "timestamp": "Feb-01-2025 12:00 AM"},
+        {"label": "3 Zone Monthly Pass - Mar", "price": 193.80, "period_type": "month", "period_key": "2025-03", "timestamp": "Mar-01-2025 12:00 AM"},
+        {"label": "UPass - Apr", "price": 46.90, "period_type": "month", "period_key": "2025-04", "timestamp": "Apr-01-2025 12:00 AM"},
+        {"label": "Day Pass - May 8", "price": 11.95, "period_type": "day", "period_key": "2025-05-08", "timestamp": "May-08-2025 08:00 AM"},
+    ]
+
+    awards_by_tier = [
+        {"tier": "Easy / Bronze", "awards": [
+            {"title": "7-Day Streak (Sun–Sat)", "description": "Used Transit every day of the week", "icon": "awards/fire-icon-free-png-bronze.png"},
+            {"title": "50 Active Days", "description": "Used Transit for 50 days of the year", "icon": "awards/TranslinkCompasslogo-bronze.png"},
+            {"title": "Basic Transit Rider", "description": "Rode transit at least 200 times in a year", "icon": "awards/Translinkbus-bronze.png"},
+            {"title": "Basic SkyTrain Rider", "description": "Rode the SkyTrain at least 50 times", "icon": "awards/Translinkexpo-bronze.png"},
+            {"title": "SeaBus First Voyage", "description": "Took at least 1 SeaBus trip", "icon": "awards/Translinkseabus.svg.png"},
+            {"title": "West Coast Express First Ride", "description": "Took at least 1 WCE trip", "icon": "awards/Translinkwce.svg.png"},
+        ]},
+        {"tier": "Medium / Silver", "awards": [
+            {"title": "100 Active Days", "description": "Used Transit for 100 days of the year", "icon": "awards/TranslinkCompasslogo-silver.png"},
+            {"title": "2-Week Streak", "description": "Used Transit for 14 days in a row", "icon": "awards/fire-icon-free-png-silver.png"},
+            {"title": "Common Transit Rider", "description": "Rode transit at least 500 times in a year", "icon": "awards/Translinkbus-silver.png"},
+            {"title": "Regular SkyTrain Rider", "description": "Rode the SkyTrain at least 200 times", "icon": "awards/Translinkexpo-silver.png"},
+            {"title": "All Nighters", "description": "Used transit 2 or more times between 2–4 AM", "icon": "awards/Translinkbus-night.png", "hover_count": 4, "hover_label": "Tap-ins between 2–4 AM"},
+            {"title": "Midnight Trains", "description": "Used SkyTrain 5 or more times past 12 AM", "icon": "awards/Translinkexpo-midnight.png", "hover_count": 7, "hover_label": "SkyTrain tap-ins past 12 AM"},
+            {"title": "First Trains", "description": "Used SkyTrain 5 or more times between 4–6 AM", "icon": "awards/Translinkexpo-early.png", "hover_count": 8, "hover_label": "SkyTrain tap-ins between 4–6 AM"},
+        ]},
+        {"tier": "Hard / Gold", "awards": [
+            {"title": "1-Month Streak", "description": "Used Transit every day for a full calendar month", "icon": "awards/fire-icon-free-png-gold.png"},
+            {"title": "250 Active Days", "description": "Used Transit for 250 days of the year", "icon": "awards/TranslinkCompasslogo-gold.png"},
+            {"title": "Round the Clock", "description": "Used transit at least once for every hour of the day", "icon": "awards/clock-icon-in-flat-design-style-analog-time-signs-illustration-png.png"},
+            {"title": "Station Fan", "description": "At least 200 uses of a station in a year", "icon": "awards/Translinkexpo-gold.png"},
+            {"title": "Frequent Transit Rider", "description": "Rode transit at least 1000 times in a year", "icon": "awards/Translinkbus-gold.png"},
+            {"title": "Frequent SkyTrain Rider", "description": "Rode the SkyTrain at least 600 times", "icon": "awards/Translinkexpo-gold.png"},
+        ]},
+        {"tier": "Extreme / Diamond", "awards": [
+            {"title": "350 Active Days", "description": "Used Transit for 350 days of the year", "icon": "awards/TranslinkCompasslogo-diamond.png"},
+            {"title": "All SkyTrain Stations Visited", "description": "Visited every SkyTrain station at least once in the year", "icon": "awards/Translinkexpo-diamond.png"},
+            {"title": "All WCE Stations Visited", "description": "Visited every WCE station at least once in the year", "icon": "awards/Translinkwce-diamond.png"},
+        ]},
+    ]
+    for tier in awards_by_tier:
+        for award in tier["awards"]:
+            award["earned"] = True
+
+    hours = list(range(24))
+    hour_values = [12, 4, 2, 1, 3, 12, 38, 76, 82, 61, 48, 50, 54, 49, 48, 52, 73, 96, 92, 68, 43, 28, 18, 12]
+    weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    weekday_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    demo_balance_values = [58.40, 46.20, 62.10, 51.75, 68.30, 54.10, 72.45, 59.60, 63.20, 49.85, 57.40, 42.15]
+    demo_balance_change_points = [
+        {"x": day_index, "y": balance, "date": f"{month_names[index]} 1, 2025"}
+        for index, (day_index, balance) in enumerate(zip(
+            [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334],
+            demo_balance_values,
+        ))
+    ]
+    demo_day_hour_values = [[max(1, int(value * factor)) for value in hour_values] for factor in (1.0, 0.96, 1.02, 0.98, 0.94, 0.54, 0.42)]
+    used_station_names = {utils.canonicalize_station_name(name) for name in station_names}
+    unused_stations = [
+        name for name in utils.SkyTrainStns
+        if utils.canonicalize_station_name(name) not in used_station_names
+    ]
+    demo_special_stops = [
+        {"name": "Lonsdale Quay", "type": "seabus", "uses": 10, "lat": 49.310161, "lon": -123.083358, "last_used_display": "Recently"},
+        {"name": "Waterfront", "type": "wce", "uses": 18, "lat": 49.286053, "lon": -123.11158, "last_used_display": "Recently"},
+        {"name": "Moody Centre", "type": "wce", "uses": 18, "lat": 49.278067, "lon": -122.846248, "last_used_display": "Recently"},
+        {"name": "Coquitlam Central", "type": "wce", "uses": 0, "lat": 49.273909, "lon": -122.800056, "last_used_display": "Never"},
+        {"name": "Port Coquitlam", "type": "wce", "uses": 0, "lat": 49.261481, "lon": -122.77402, "last_used_display": "Never"},
+        {"name": "Pitt Meadows", "type": "wce", "uses": 0, "lat": 49.225772, "lon": -122.688381, "last_used_display": "Never"},
+        {"name": "Maple Meadows", "type": "wce", "uses": 0, "lat": 49.216465, "lon": -122.666097, "last_used_display": "Never"},
+        {"name": "Port Haney", "type": "wce", "uses": 0, "lat": 49.212168, "lon": -122.605242, "last_used_display": "Never"},
+        {"name": "Mission City", "type": "wce", "uses": 0, "lat": 49.133594, "lon": -122.30486, "last_used_display": "Never"},
+    ]
+    top_image_raw = utils.stationImages.get(top_station_names[0])
+    if top_image_raw and top_image_raw.startswith(("http://", "https://")):
+        top_image = top_image_raw
+    elif top_image_raw:
+        top_image = url_for("static", filename=top_image_raw)
+    else:
+        top_image = None
+
+    duration_days, duration_hours, duration_minutes = format_duration_days_hours_minutes(16240)
+
+    return render_template(
+        "results.html",
+        demoMode=True,
+        stations=stations,
+        TripsNum=1248,
+        SSWtripsNum=648,
+        percentSSW=51.9,
+        SkytrainTripsNum=625,
+        SeabusTripsNum=5,
+        WCETripsNum=18,
+        station_labels=station_names,
+        station_values=station_counts,
+        hours=hours,
+        hour_values=hour_values,
+        days=weekdays,
+        weekday_values=[248, 236, 242, 230, 207, 72, 13],
+        weekday_full_names=weekday_names,
+        day_hour_values=demo_day_hour_values,
+        UnusedStations=unused_stations,
+        wceLonsdaleStations=demo_special_stops,
+        countDays=248,
+        month=month_names,
+        month_values=[96, 102, 111, 104, 116, 108, 120, 112, 107, 109, 91, 72],
+        balance_labels=month_names,
+        balance_values=demo_balance_values,
+        balance_granularity="month",
+        balance_change_labels=[],
+        balance_change_values=[],
+        balance_timeline_start="2025-01-01",
+        balance_timeline_days=365,
+        balance_change_points=demo_balance_change_points,
+        balance_intraday_days=[],
+        stored_value_spent=684.20,
+        pass_spend=503.45,
+        pass_count=5,
+        total_transit_spent=1187.65,
+        extra_stored_value_if_no_pass=299.55,
+        extra_stored_value_by_month={"2025-01": 160.00, "2025-02": 205.00, "2025-03": 275.00, "2025-04": 138.00},
+        extra_stored_value_by_day={"2025-05-08": 25.00},
+        pass_timeline_entries=pass_timeline_entries,
+        streak=23,
+        StreakStart="May 4, 2025",
+        StreakEnd="May 26, 2025",
+        topName=top_station_names[0],
+        topCount=220,
+        topImage=top_image,
+        minutes=16240,
+        duration_days=duration_days,
+        duration_hours=duration_hours,
+        duration_minutes=duration_minutes,
+        top10BusStops=bus_stops[:10],
+        top10StationPairs=demo_top_station_pairs,
+        skytrainSegmentUsage=demo_skytrain_segment_usage,
+        shortestPairMinutes={},
+        topStationMapPoints=station_map_points[:5],
+        topBusStopMapPoints=bus_map_points[:10],
+        remainingStationMapPoints=station_map_points[5:],
+        remainingBusStopMapPoints=bus_map_points[10:],
+        skytrainStationPoints=[],
+        awardsByTier=awards_by_tier,
+    )
+
+
 @app.route("/", methods=["GET", "POST"])
 def upload_file():
     if request.method == "POST":
@@ -2959,13 +3407,21 @@ def upload_file():
             Top10BusStopsWithNames = []
             for stop_id, count in Top10BusStops:
                 # Try to get the stop name from the dictionary, fallback to "Bus Stop {id}"
-                stop_name = utils.busStopNames.get(stop_id, f"Bus Stop {stop_id}")
+                location = utils.get_bus_stop_location(stop_id)
+                stop_name = utils.busStopNames.get(
+                    stop_id,
+                    location["name"] if location else f"Bus Stop {stop_id}",
+                )
                 Top10BusStopsWithNames.append((stop_name, stop_id, count))
 
             RemainingBusStops = BusStopCounts[10:]
             RemainingBusStopsWithNames = []
             for stop_id, count in RemainingBusStops:
-                stop_name = utils.busStopNames.get(stop_id, f"Bus Stop {stop_id}")
+                location = utils.get_bus_stop_location(stop_id)
+                stop_name = utils.busStopNames.get(
+                    stop_id,
+                    location["name"] if location else f"Bus Stop {stop_id}",
+                )
                 RemainingBusStopsWithNames.append((stop_name, stop_id, count))
 
             topBusStopMapPoints = []
@@ -3916,6 +4372,8 @@ def upload_file():
                 },
             ]
             
+            duration_days, duration_hours, duration_minutes = format_duration_days_hours_minutes(minutes)
+
             return render_template("results.html", stations=stations,
                 TripsNum=int(TripsNum),
                 SSWtripsNum=int(SSWtripsNum),
@@ -3957,6 +4415,9 @@ def upload_file():
                 streak=streak, StreakStart=StreakStart, StreakEnd=StreakEnd,
                 topName=topName, topCount=topCount, topImage=topImage,
                 minutes=int(minutes),
+                duration_days=duration_days,
+                duration_hours=duration_hours,
+                duration_minutes=duration_minutes,
                 top10BusStops=Top10BusStopsWithNames,
                 top10StationPairs=Top10StationPairs,
                 skytrainSegmentUsage=skytrainSegmentUsage,

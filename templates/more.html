@@ -98,7 +98,7 @@
     </div>
 
     <div class="card">
-        <h2>Upload multiple CSV's</h2>
+        <h2>Upload multiple files</h2>
         <form id="multi-csv-form" method="POST" action="/more/upload-multiple" enctype="multipart/form-data">
             <input id="multi-csv-input" type="file" name="files" accept=".csv" multiple style="display: none;">
             <div id="multi-csv-dropzone" class="multi-csv-dropzone">
@@ -110,8 +110,8 @@
             <p id="multi-csv-selected">No files selected yet.</p>
             <div id="multi-csv-list" class="multi-csv-list"></div>
             <div class="multi-csv-actions">
-                <button type="submit">Upload CSV's</button>
-                <button id="multi-csv-remove-btn" class="remove-csv-btn" type="button">Remove CSV's</button>
+                <button type="submit">Upload Files</button>
+                <button id="multi-csv-remove-btn" class="remove-csv-btn" type="button">Remove Files</button>
             </div>
         </form>
     </div>
@@ -129,6 +129,8 @@
             <button type="submit">Upload CSV</button>
         </form>
     </div>
+
+    <a href="/more/demo-slideshow" class="button-card button-small">Try Slideshow Demo</a>
 
     <a href="/" class="button-card button-small">&laquo; Back to Home / Upload Page</a>
 

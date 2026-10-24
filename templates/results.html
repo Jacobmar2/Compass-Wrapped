@@ -66,6 +66,7 @@
                 {{ duration_hours }} {{ 'hour' if duration_hours == 1 else 'hours' }}, {{ duration_minutes }} {{ 'min' if duration_minutes == 1 else 'mins' }}</span>
         </h2>
 
+        {% if not demoMode %}
         <button
             class="section-share-btn"
             type="button"
@@ -76,6 +77,7 @@
         >
             <img src="{{ url_for('static', filename='icons/share.svg') }}" alt="" class="section-share-icon" aria-hidden="true">
         </button>
+        {% endif %}
 
     </div>
 
@@ -124,6 +126,7 @@
             </li>
         </ul>
         <br>
+        {% if not demoMode %}
         <button
             class="section-share-btn"
             type="button"
@@ -134,6 +137,7 @@
         >
             <img src="{{ url_for('static', filename='icons/share.svg') }}" alt="" class="section-share-icon" aria-hidden="true">
         </button>
+        {% endif %}
     </div>
 
     <div class="results-card" id="section-top-stations">
@@ -153,6 +157,7 @@
             {% endfor %}
         </ul>
         <br>
+        {% if not demoMode %}
         <button
             class="section-share-btn"
             type="button"
@@ -163,6 +168,7 @@
         >
             <img src="{{ url_for('static', filename='icons/share.svg') }}" alt="" class="section-share-icon" aria-hidden="true">
         </button>
+        {% endif %}
     </div>
     
 <!-- 📌 Carousel Section -->

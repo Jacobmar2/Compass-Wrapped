@@ -2,6 +2,12 @@
 
 Live Project: https://compass-wrapped-tau.vercel.app/
 
+## Persistent About Page Counters
+
+The About page displays page views and successful reports generated from the original upload page. It does not count reports made through “More Compass Wrapped.” Only these aggregate totals are stored; uploaded CSV files and report data are not saved.
+
+For the counters to persist on Vercel, connect a Vercel Postgres/Neon database and make its connection string available to the app as `POSTGRES_URL` or `DATABASE_URL` in the Vercel project environment variables, then redeploy. The app creates its counters table automatically. Without a configured database, the About page shows that the counters are unavailable.
+
 ## What is Compass Wrapped?
  A “Spotify Wrapped” style transit ridership stats generator for Compass Card data
 
@@ -36,7 +42,7 @@ Made by Jacob Martinez
 
 ● SkyTrain trips are counted once for every 2 taps (entering and exiting) and for hours of day, days of week bar graphs (entrance timestamp only, just like buses), while station usage are counted both for each entry and each exit.
 
-● Your CSV files will be private and will never be saved or uploaded anywhere. No data generated here will be saved anywhere either.
+● Your CSV files and ridership reports are not saved. The About page stores only aggregate page-view and report totals.
 
 ● You may insert a time range shorter than a year, where all of the stats except for average number of trips per day/week/month (in the green box) will stay accurate
 

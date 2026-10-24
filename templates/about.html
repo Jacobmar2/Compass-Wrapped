@@ -14,6 +14,23 @@
 
     <!-- ⭐ SAMPLE TEXT BLOCK -->
     <div class="howto-text">
+        <section class="about-stats" aria-labelledby="about-stats-heading">
+            <h3 id="about-stats-heading">Compass Wrapped so far</h3>
+            {% if counters %}
+                <div class="about-stat">
+                    <strong>{{ "{:,}".format(counters.site_visits) }}</strong>
+                    <span>Site visits</span>
+                </div>
+                <div class="about-stat">
+                    <strong>{{ "{:,}".format(counters.reports_generated) }}</strong>
+                    <span>Compass Cards wrapped</span>
+                </div>
+                <p>Site visits count page views, not unique visitors. Reports count successful uploads from the original upload page.</p>
+            {% else %}
+                <p class="about-stats-unavailable">Counters are temporarily unavailable. Persistent database storage must be configured.</p>
+            {% endif %}
+        </section>
+
         <h3>What is Compass Wrapped?</h3>
         <p>
             A “Spotify Wrapped” style transit ridership stats generator for Compass Card data

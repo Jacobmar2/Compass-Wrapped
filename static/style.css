@@ -507,6 +507,36 @@ button:hover {
     text-align: center;   /* everything centered by default */
 }
 
+.about-stats {
+    margin: 1.5em auto;
+    padding: 1em;
+    max-width: 700px;
+    border-radius: 0.75em;
+    background: #d3e6f3;
+    color: #173042;
+}
+
+.about-stats h3 {
+    margin-top: 0;
+}
+
+.about-stat {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.25em;
+    min-width: 180px;
+    margin: 0.5em;
+}
+
+.about-stat strong {
+    color: #009cde;
+    font-size: 1.8em;
+}
+
+.about-stats-unavailable {
+    color: #8a2c2c;
+}
+
 .about-notes {
     text-align: left;     /* override for notes */
     display: inline-block; /* keeps it centered within page while text is left-aligned */
@@ -1885,7 +1915,8 @@ html {
     }
 
     .carousel-viewport,
-    .award-carousel-viewport {
+    .award-carousel-viewport,
+    .carousel-viewport .unused-list {
         touch-action: pan-y;
     }
 
@@ -2443,4 +2474,3 @@ html {
         display: none !important;
     }
 }
-

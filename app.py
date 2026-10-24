@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for,flash
+from flask import Flask, g, render_template, request, redirect, url_for, flash
 import pandas as pd
 import os
 import csv
@@ -22,6 +22,76 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ALLOWED_EXTENSIONS = {".csv"}
 MAX_CSV_ROWS = 150000
 TIMESTAMP_FORMAT = "%b-%d-%Y %I:%M %p"
+COUNTER_TABLE_SQL = """
+    CREATE TABLE IF NOT EXISTS site_counters (
+        counter_name TEXT PRIMARY KEY,
+        value BIGINT NOT NULL DEFAULT 0 CHECK (value >= 0)
+    )
+"""
+
+
+class CounterStoreError(Exception):
+    pass
+
+
+def _query_counter_store(query, params=()):
+    database_url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
+    if not database_url:
+        raise CounterStoreError("Set DATABASE_URL or POSTGRES_URL to enable persistent counters.")
+
+    try:
+        import psycopg
+    except ImportError as error:
+        raise CounterStoreError("Install the psycopg dependency to enable persistent counters.") from error
+
+    try:
+        with psycopg.connect(database_url, connect_timeout=5) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(COUNTER_TABLE_SQL)
+                cursor.execute(query, params)
+                return cursor.fetchall() if cursor.description else []
+    except psycopg.Error as error:
+        raise CounterStoreError("Could not read or update the persistent counters.") from error
+
+
+def increment_counter(counter_name):
+    rows = _query_counter_store(
+        """
+        INSERT INTO site_counters (counter_name, value)
+        VALUES (%s, 1)
+        ON CONFLICT (counter_name)
+        DO UPDATE SET value = site_counters.value + 1
+        RETURNING value
+        """,
+        (counter_name,),
+    )
+    return rows[0][0]
+
+
+def get_site_counters():
+    rows = _query_counter_store(
+        """
+        SELECT counter_name, value
+        FROM site_counters
+        WHERE counter_name IN (%s, %s)
+        """,
+        ("site_visits", "reports_generated"),
+    )
+    counters = {"site_visits": 0, "reports_generated": 0}
+    counters.update(dict(rows))
+    return counters
+
+
+@app.before_request
+def count_site_visit():
+    if request.method != "GET" or request.endpoint is None or request.endpoint == "static":
+        return
+
+    try:
+        increment_counter("site_visits")
+    except CounterStoreError as error:
+        g.counter_store_error = True
+        app.logger.error("Unable to update site visit counter: %s", error)
 
 WCE_TERMINAL_STATION_KEYS = {"waterfront", "moody center"}
 SEGMENTS_CSV_PATH = os.path.join(BASE_DIR, "static", "data", "skytrain_segments.csv")
@@ -2429,7 +2499,12 @@ def howto():
 
 @app.route("/about")
 def about():
-    return render_template("about.html")
+    try:
+        counters = get_site_counters()
+    except CounterStoreError as error:
+        counters = None
+        app.logger.error("Unable to load About page counters: %s", error)
+    return render_template("about.html", counters=counters)
 
 
 @app.route("/more")
@@ -3183,6 +3258,11 @@ def demo_results():
         top_image = url_for("static", filename=top_image_raw)
     else:
         top_image = None
+
+    for tier in awards_by_tier:
+        for award in tier["awards"]:
+            if award["title"] == "Station Fan":
+                award["icon_url"] = top_image
 
     duration_days, duration_hours, duration_minutes = format_duration_days_hours_minutes(16240)
 
@@ -4374,7 +4454,7 @@ def upload_file():
             
             duration_days, duration_hours, duration_minutes = format_duration_days_hours_minutes(minutes)
 
-            return render_template("results.html", stations=stations,
+            report = render_template("results.html", stations=stations,
                 TripsNum=int(TripsNum),
                 SSWtripsNum=int(SSWtripsNum),
                 percentSSW=percentSSW,
@@ -4432,6 +4512,11 @@ def upload_file():
                     for tier in awardsByTier
                 ]
                 )
+            try:
+                increment_counter("reports_generated")
+            except CounterStoreError as error:
+                app.logger.error("Unable to update report counter: %s", error)
+            return report
 
         if os.path.exists(fileName):
             os.remove(fileName)

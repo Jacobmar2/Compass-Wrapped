@@ -2,12 +2,6 @@
 
 Live Project: https://compass-wrapped-tau.vercel.app/
 
-## Persistent About Page Counters
-
-The About page displays page views and successful reports generated from the original upload page. It does not count reports made through “More Compass Wrapped.” Only these aggregate totals are stored; uploaded CSV files and report data are not saved.
-
-For the counters to persist on Vercel, connect a Vercel Postgres/Neon database and make its connection string available to the app as `POSTGRES_URL` or `DATABASE_URL` in the Vercel project environment variables, then redeploy. The app creates its counters table automatically. Without a configured database, the About page shows that the counters are unavailable.
-
 ## What is Compass Wrapped?
  A “Spotify Wrapped” style transit ridership stats generator for Compass Card data
 
